@@ -1,0 +1,1 @@
+genfscon proc /devinfo/ufs u:object_r:proc_ufs_file:s0

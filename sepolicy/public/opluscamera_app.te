@@ -1,1 +1,2 @@
 type opluscamera_app, domain, mlstrustedsubject;
+type opluscamera_app_data_file, file_type, data_file_type, app_data_file_type;

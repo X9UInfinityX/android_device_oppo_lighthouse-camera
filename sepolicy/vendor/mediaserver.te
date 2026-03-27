@@ -1,0 +1,3 @@
+# Allow mediaserver to access camera app's cache files
+allow mediaserver opluscamera_app_data_file:dir { search open getattr };
+allow mediaserver opluscamera_app_data_file:file { read write open getattr };

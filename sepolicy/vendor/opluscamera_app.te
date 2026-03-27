@@ -1,13 +1,59 @@
 app_domain(opluscamera_app)
-hal_client_domain(opluscamera_app, vendor_hal_dspmanager)
 net_domain(opluscamera_app)
 
-allow opluscamera_app vendor_hal_orms_hwservice:hwservice_manager find;
-
 allow opluscamera_app adsprpcd_file:dir r_dir_perms;
-allow opluscamera_app vendor_qdsp_device:chr_file rw_file_perms;
-allow opluscamera_app vendor_xdsp_device:chr_file r_file_perms;
+allow opluscamera_app public_adsprpcd_file:file r_file_perms;
 
-allow opluscamera_app vendor_camera_data_file:dir create_dir_perms;
-allow opluscamera_app vendor_camera_data_file:file create_file_perms;
-r_dir_file(opluscamera_app, vendor_persist_camera_file)
+allow opluscamera_app vendor_data_file:dir  { read open search write add_name remove_name create getattr };
+allow opluscamera_app vendor_data_file:file { read open write create unlink getattr };
+allow opluscamera_app vendor_camera_update_data_file:file { read open write create unlink getattr };
+allow opluscamera_app vendor_camera_update_data_file:dir { read open search write add_name remove_name create getattr };
+allow opluscamera_app vendor_xdsp_device:file { read open write create unlink getattr };
+allow opluscamera_app vendor_xdsp_device:chr_file { read open write create unlink getattr ioctl };
+allow opluscamera_app vendor_xdsp_device:dir { read open search write add_name remove_name create getattr };
+allow opluscamera_app vendor_qdsp_device:file { read open write create unlink getattr };
+allow opluscamera_app vendor_qdsp_device:dir { read open search write add_name remove_name create getattr };
+allow opluscamera_app proc_ufs_file:file { read open write create getattr };
+allow opluscamera_app opluscamera_app_data_file:file { read open write create unlink getattr };
+allow opluscamera_app opluscamera_app_data_file:dir { read open search write add_name remove_name create getattr };
+
+# FastRPC devices
+# vendor_qdsp_device: read-only only — neverallow on SM8750 blocks write/append
+# for non-HAL domains. The camera app only needs to open/read/ioctl for DSP
+# session setup; actual writes go through the HAL.
+allow opluscamera_app vendor_qdsp_device:chr_file { ioctl read };
+
+# selinuxfs
+allow opluscamera_app selinuxfs:file { read open };
+
+# ADSP RPC dir search
+allow opluscamera_app adsprpcd_file:dir search;
+
+# Binder: camera app ↔ camera HAL
+allow opluscamera_app hal_camera_default:binder { call transfer };
+
+# Camera properties
+get_prop(opluscamera_app, vendor_camera_prop)
+dontaudit opluscamera_app default_prop:file { read open getattr map };
+get_prop(opluscamera_app, camera_config_prop)
+binder_use(opluscamera_app)
+binder_call(opluscamera_app, system_server)
+binder_call(opluscamera_app, surfaceflinger)
+allow opluscamera_app vendor_default_prop:file { open read getattr map };
+
+
+
+allow opluscamera_app activity_service:service_manager find;
+allow opluscamera_app display_service:service_manager find;
+allow opluscamera_app surfaceflinger_service:service_manager find;
+allow opluscamera_app package_native_service:service_manager find;
+allow opluscamera_app permission_service:service_manager find;
+dontaudit opluscamera_app vendor_hal_qspmhal_service:service_manager find;
+
+
+# Allow binder communication with QSPM HAL
+allow opluscamera_app vendor_hal_qspmhal_default:binder { call transfer };
+
+
+# Allow finding the offline camera service
+# allow opluscamera_app vendor_hal_offlinecamera_service:service_manager find;
