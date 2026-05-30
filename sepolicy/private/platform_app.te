@@ -1,0 +1,10 @@
+# Gallery is platform-signed in this port but stock Qualcomm policy only grants
+# unsigned HexLP access to untrusted_app/priv_app. Retouch IPU face detection
+# needs the same client access while running as platform_app.
+hal_client_domain(platform_app, vendor_hal_unsignedhexlp)
+allow platform_app vendor_hal_hexlp_server:fd use;
+
+# AIUnit extracts downloaded editor plugins into its app data directory and
+# loads their JNI libraries from there.
+allow platform_app app_data_file:file { r_file_perms execute };
+auditallow platform_app app_data_file:file execute;

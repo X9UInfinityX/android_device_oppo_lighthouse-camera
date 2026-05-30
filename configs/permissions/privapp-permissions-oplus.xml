@@ -7,6 +7,10 @@
      <!-- OPLUS camera unit sdk -->
      <library name = "com.oplus.camera.unit.sdk"
         file = "/system_ext/framework/com.oplus.camera.unit.sdk.jar" />
+     <library name = "com.oppo.camera.unit.sdk"
+        file = "/system_ext/framework/com.oplus.camera.unit.sdk.jar" />
+     <library name="androidx.camera.extensions.impl"
+        file="/system_ext/framework/androidx.camera.extensions.impl.jar"/>
 
      <!-- OPLUS appplatform -->
      <privapp-permissions package="com.oplus.appplatform">
@@ -38,6 +42,9 @@
         <permission name="android.permission.WRITE_MEDIA_STORAGE"/>
         <permission name="android.permission.WRITE_SECURE_SETTINGS"/>
         <permission name="android.permission.SUBSCRIBE_TO_KEYGUARD_LOCKED_STATE"/>
+        <permission name="oplus.permission.OPLUS_COMPONENT_SAFE"/>
+        <permission name="oppo.permission.OPPO_COMPONENT_SAFE"/>
+        <permission name="com.oplus.permission.safe.CAMERA"/>
      </privapp-permissions>
 
     <!-- OPLUS gallery -->
@@ -45,6 +52,24 @@
         <permission name="android.permission.SCHEDULE_EXACT_ALARM"/>
         <permission name="android.permission.WRITE_MEDIA_STORAGE"/>
         <permission name="android.permission.WRITE_SECURE_SETTINGS"/>
+        <permission name="com.oplus.permission.safe.AI_APP"/>
+        <permission name="com.oplus.permission.safe.APP_MANAGER"/>
+        <permission name="com.oplus.permission.safe.ASSISTANT"/>
+        <permission name="com.oplus.permission.safe.AUTHENTICATE"/>
+        <permission name="com.oplus.permission.safe.CAR_LINK"/>
+        <permission name="com.oplus.permission.safe.CONNECTIVITY"/>
+        <permission name="com.oplus.permission.safe.IOT"/>
+        <permission name="com.oplus.permission.safe.PRIVATE"/>
+        <permission name="com.oplus.permission.safe.PROTECT"/>
+        <permission name="com.oplus.permission.safe.READ_COMMON"/>
+        <permission name="com.oplus.permission.safe.SAU"/>
+        <permission name="com.oplus.permission.safe.SECURITY"/>
+        <permission name="com.oplus.permission.safe.SETTINGS"/>
+        <permission name="com.oplus.permission.safe.SETTINGS_SEARCH"/>
+        <permission name="com.oplus.permission.safe.WINDOW"/>
+        <permission name="com.oppo.permission.safe.PRIVATE"/>
+        <permission name="com.oppo.permission.safe.SAU"/>
+        <permission name="com.oppo.permission.safe.SECURITY"/>
     </privapp-permissions>
 
     <!-- OPLUS exsystemservice -->

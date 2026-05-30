@@ -1,0 +1,29 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: koaaN <koaan@users.noreply.github.com>
+Date: Mon, 18 May 2026 15:58:00 +0200
+Subject: [PATCH] Decode smali for SystemProperties wrapper fix
+
+This patch is intentionally only used by extract-utils to request source
+decoding from apktool. The actual replacement is performed by
+blob_fixup_oplus_camera_system_properties in extract-files.py so every
+reference is covered.
+---
+ smali_classes33/r7/h.smali | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/smali_classes33/r7/h.smali b/smali_classes33/r7/h.smali
+index 0000000..0000000 100644
+--- a/smali_classes33/r7/h.smali
++++ b/smali_classes33/r7/h.smali
+@@ -23,7 +23,7 @@
+ 
+     const/4 p0, 0x0
+ 
+-    invoke-static {v0, p0}, Lcom/oplus/wrapper/os/SystemProperties;->getInt(Ljava/lang/String;I)I
++    invoke-static {v0, p0}, Landroid/os/SystemProperties;->getInt(Ljava/lang/String;I)I
+ 
+     move-result v0
+ 
+-- 
+2.48.1
+

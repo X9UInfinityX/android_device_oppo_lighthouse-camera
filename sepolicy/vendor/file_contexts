@@ -13,6 +13,8 @@
 /(vendor|odm)/lib(64)?/libaisr\.so    u:object_r:same_process_hal_file:s0
 /(vendor|odm)/lib(64)?/libpower\.so    u:object_r:same_process_hal_file:s0
 /(vendor|odm)/lib(64)?/libaiseg\.so    u:object_r:same_process_hal_file:s0
+/(vendor|odm)/lib(64)?/libaiboost\.so    u:object_r:same_process_hal_file:s0
+/(vendor|odm)/lib(64)?/libaiboost_llm\.so    u:object_r:same_process_hal_file:s0
 /(vendor|odm)/lib(64)?/libalCFR\.so    u:object_r:same_process_hal_file:s0
 /(vendor|odm)/lib(64)?/libtrace\.so    u:object_r:same_process_hal_file:s0
 /(vendor|odm)/lib(64)?/libalhDZ\.so    u:object_r:same_process_hal_file:s0
@@ -94,6 +96,7 @@
 /(vendor|odm)/lib(64)?/libalgo\.hdrv4\.so    u:object_r:same_process_hal_file:s0
 /(vendor|odm)/lib(64)?/libalgo\.bokeh\.so    u:object_r:same_process_hal_file:s0
 /(vendor|odm)/lib(64)?/libAlgoProcess\.so    u:object_r:same_process_hal_file:s0
+/(vendor|odm)/lib(64)?/libalog\.so    u:object_r:same_process_hal_file:s0
 /(vendor|odm)/lib(64)?/libapsultrahdr\.so    u:object_r:same_process_hal_file:s0
 /(vendor|odm)/lib(64)?/libarcsoft_tfm\.so    u:object_r:same_process_hal_file:s0
 /(vendor|odm)/lib(64)?/libAncHumBokeh\.so    u:object_r:same_process_hal_file:s0
@@ -141,6 +144,8 @@
 /(vendor|odm)/lib(64)?/libFaceBeautyPre\.so    u:object_r:same_process_hal_file:s0
 /(vendor|odm)/lib(64)?/libAncSegmentSdk\.so    u:object_r:same_process_hal_file:s0
 /(vendor|odm)/lib(64)?/libFaceBeautyJni\.so    u:object_r:same_process_hal_file:s0
+/(vendor|odm)/lib(64)?/libcreatebinForBaseretouch\.so    u:object_r:same_process_hal_file:s0
+/(vendor|odm)/lib(64)?/libcreatebinForFaceretouch\.so    u:object_r:same_process_hal_file:s0
 /(vendor|odm)/lib(64)?/libAncSegBaseJni\.so    u:object_r:same_process_hal_file:s0
 /(vendor|odm)/lib(64)?/libAncSegBaseSdk\.so    u:object_r:same_process_hal_file:s0
 /(vendor|odm)/lib(64)?/libAlgoInterface\.so    u:object_r:same_process_hal_file:s0
@@ -149,6 +154,9 @@
 /(vendor|odm)/lib(64)?/libQnnHtpV73Stub\.so    u:object_r:same_process_hal_file:s0
 /(vendor|odm)/lib(64)?/libQnnHtpV75Stub\.so    u:object_r:same_process_hal_file:s0
 /(vendor|odm)/lib(64)?/libQnnHtpV79Stub\.so    u:object_r:same_process_hal_file:s0
+/(vendor|odm)/lib(64)?/libQnnHtpV81CalculatorStub\.so    u:object_r:same_process_hal_file:s0
+/(vendor|odm)/lib(64)?/libQnnHtpV81Stub\.so    u:object_r:same_process_hal_file:s0
+/(vendor|odm)/lib(64)?/libQnnSaver\.so    u:object_r:same_process_hal_file:s0
 /(vendor|odm)/lib(64)?/libsymphonypower\.so    u:object_r:same_process_hal_file:s0
 /(vendor|odm)/lib(64)?/libalgo\.OPXvivid\.so    u:object_r:same_process_hal_file:s0
 /(vendor|odm)/lib(64)?/libalgo\.irfusion\.so    u:object_r:same_process_hal_file:s0
@@ -272,6 +280,7 @@
 /(vendor|odm)/lib(64)?/rfsa/adsp/libQnnHtpV73\.so    u:object_r:same_process_hal_file:s0
 /(vendor|odm)/lib(64)?/rfsa/adsp/libQnnHtpV75\.so    u:object_r:same_process_hal_file:s0
 /(vendor|odm)/lib(64)?/rfsa/adsp/libQnnHtpV79\.so    u:object_r:same_process_hal_file:s0
+/(vendor|odm)/lib(64)?/rfsa/adsp(/.*)?/libQnnHtpV81\.so    u:object_r:same_process_hal_file:s0
 /(vendor|odm)/lib(64)?/libSuperSensorFallback\.so    u:object_r:same_process_hal_file:s0
 /(vendor|odm)/lib(64)?/libsnpe_dsp_domains_v3\.so    u:object_r:same_process_hal_file:s0
 /(vendor|odm)/lib(64)?/libportrait_repair_ocl\.so    u:object_r:same_process_hal_file:s0
@@ -316,6 +325,7 @@
 /(vendor|odm)/lib(64)?/libarcsoft_stripe_removal\.so    u:object_r:same_process_hal_file:s0
 /(vendor|odm)/lib(64)?/libPreviewAlgo\.edgefilter\.so    u:object_r:same_process_hal_file:s0
 /(vendor|odm)/lib(64)?/libarcsoft_hdr_denoise_api\.so    u:object_r:same_process_hal_file:s0
+/(vendor|odm)/lib(64)?/libvega_common\.so    u:object_r:same_process_hal_file:s0
 /(vendor|odm)/lib(64)?/libarcsoft_super_night_raw\.so    u:object_r:same_process_hal_file:s0
 /(vendor|odm)/lib(64)?/libVDDualCameraBlurlessAPI\.so    u:object_r:same_process_hal_file:s0
 /(vendor|odm)/lib(64)?/libAncHumanSegFigureFusion\.so    u:object_r:same_process_hal_file:s0
@@ -328,6 +338,7 @@
 /(vendor|odm)/lib(64)?/rfsa/adsp/libQnnHtpV75Skel\.so    u:object_r:same_process_hal_file:s0
 /(vendor|odm)/lib(64)?/libQnnHtpV79CalculatorStub\.so    u:object_r:same_process_hal_file:s0
 /(vendor|odm)/lib(64)?/rfsa/adsp/libQnnHtpV79Skel\.so    u:object_r:same_process_hal_file:s0
+/(vendor|odm)/lib(64)?/rfsa/adsp(/.*)?/libQnnHtpV81Skel\.so    u:object_r:same_process_hal_file:s0
 /(vendor|odm)/lib(64)?/libdualcamirfusion.arcsoft\.so    u:object_r:same_process_hal_file:s0
 /(vendor|odm)/lib(64)?/libsnpe_dsp_domains_system\.so    u:object_r:same_process_hal_file:s0
 /(vendor|odm)/lib(64)?/libPreviewAlgo\.nightvision\.so    u:object_r:same_process_hal_file:s0
@@ -412,7 +423,7 @@
 /(vendor|odm)/lib(64)?/rfsa/adsp/libarc_hta_driver_skel\.so    u:object_r:same_process_hal_file:s0
 /(vendor|odm)/lib(64)?/libarcsoft_merge_hdr_denoise_api\.so    u:object_r:same_process_hal_file:s0
 /(vendor|odm)/lib(64)?/libOPAlgoCamAiBeautyEyeRetouchCn\.so    u:object_r:same_process_hal_file:s0
-/(vendor|odm)/lib(64)?/rfsa/adsp/libarc_htp_driver_skel\.so    u:object_r:same_process_hal_file:s0
+/(vendor|odm)/lib(64)?/rfsa/adsp(/.*)?/libarc_htp_driver_skel\.so    u:object_r:same_process_hal_file:s0
 /(vendor|odm)/lib(64)?/android.frameworks.bufferhub@1.0\.so    u:object_r:same_process_hal_file:s0
 /(vendor|odm)/lib(64)?/libarcsoft_low_light_hdr_for_neon\.so    u:object_r:same_process_hal_file:s0
 /(vendor|odm)/lib(64)?/libOPAlgoCamAiBeautyFaceRetouchCn\.so    u:object_r:same_process_hal_file:s0
@@ -530,9 +541,6 @@
 /vendor/lib(64)?/libstdc\+\+_vendor\.so  u:object_r:same_process_hal_file:s0
 /(vendor|odm)/lib(64)?/libXDocProcessSDK-jni.qti\.so u:object_r:same_process_hal_file:s0
 /(vendor|odm)/lib(64)?/libXDocProcessSDK-jni\.so    u:object_r:same_process_hal_file:s0
-/proc/devinfo/ufs u:object_r:proc_ufs_file:s0
-
-/proc/ufs u:object_r:proc_ufs_file:s0
 # Hexagon DSP-side executable needed for Halide operation
 # This is labeled as public_adsprpcd_file as it needs to be read by apps
 # (e.g. Google Camera App)

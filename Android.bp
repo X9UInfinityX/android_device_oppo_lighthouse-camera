@@ -1,0 +1,71 @@
+cc_prebuilt_library_shared {
+    name: "libQnnHtp_gallery_system_ext",
+    stem: "libQnnHtp",
+    srcs: ["configs/lib64/libQnnHtp.so"],
+    compile_multilib: "64",
+    system_ext_specific: true,
+    strip: {
+        none: true,
+    },
+    check_elf_files: false,
+}
+
+cc_prebuilt_library_shared {
+    name: "libQnnHtpPrepare_gallery_system_ext",
+    stem: "libQnnHtpPrepare",
+    srcs: ["configs/lib64/libQnnHtpPrepare.so"],
+    compile_multilib: "64",
+    system_ext_specific: true,
+    strip: {
+        none: true,
+    },
+    check_elf_files: false,
+}
+
+cc_prebuilt_library_shared {
+    name: "libQnnHtpV81Stub_gallery_system_ext",
+    stem: "libQnnHtpV81Stub",
+    srcs: ["configs/lib64/libQnnHtpV81Stub.so"],
+    compile_multilib: "64",
+    system_ext_specific: true,
+    strip: {
+        none: true,
+    },
+    check_elf_files: false,
+}
+
+cc_prebuilt_library_shared {
+    name: "libQnnHtpV81CalculatorStub_gallery_system_ext",
+    stem: "libQnnHtpV81CalculatorStub",
+    srcs: ["configs/lib64/libQnnHtpV81CalculatorStub.so"],
+    compile_multilib: "64",
+    system_ext_specific: true,
+    strip: {
+        none: true,
+    },
+    check_elf_files: false,
+}
+
+cc_prebuilt_library_shared {
+    name: "libQnnSaver_gallery_system_ext",
+    stem: "libQnnSaver",
+    srcs: ["configs/lib64/libQnnSaver.so"],
+    compile_multilib: "64",
+    system_ext_specific: true,
+    strip: {
+        none: true,
+    },
+    check_elf_files: false,
+}
+
+cc_prebuilt_library_shared {
+    name: "libQnnSystem_gallery_system_ext",
+    stem: "libQnnSystem",
+    srcs: ["configs/lib64/libQnnSystem.so"],
+    compile_multilib: "64",
+    system_ext_specific: true,
+    strip: {
+        none: true,
+    },
+    check_elf_files: false,
+}

@@ -12,22 +12,53 @@ PRODUCT_PACKAGES += \
 
 # Permissions
 PRODUCT_COPY_FILES += \
+    $(LOCAL_PATH)/configs/permissions/com.oplus.android-features.xml:$(TARGET_COPY_OUT_SYSTEM_EXT)/etc/permissions/com.oplus.android-features.xml \
     $(LOCAL_PATH)/configs/permissions/oplus_google_lens_config.xml:$(TARGET_COPY_OUT_SYSTEM_EXT)/etc/permissions/oplus_google_lens_config.xml \
     $(LOCAL_PATH)/configs/permissions/privapp-permissions-oplus.xml:$(TARGET_COPY_OUT_SYSTEM_EXT)/etc/permissions/privapp-permissions-oplus.xml \
+    $(LOCAL_PATH)/configs/framework/androidx.camera.extensions.impl.jar:$(TARGET_COPY_OUT_SYSTEM_EXT)/framework/androidx.camera.extensions.impl.jar \
     $(LOCAL_PATH)/configs/sysconfig/hiddenapi-package-oplus-whitelist.xml:$(TARGET_COPY_OUT_SYSTEM)/etc/sysconfig/hiddenapi-package-oplus-whitelist.xml
+
+# Stub classes needed by the OPlus camera shared libraries.
+PRODUCT_PACKAGES += \
+    oplus-camera-stubs
+
+PRODUCT_BOOT_JARS += \
+    oplus-camera-stubs
+
+# Gallery's ODNN retouch path dlopens QNN libraries by basename. Install the
+# OP15 QNN runtime in system_ext and place real copies in Gallery's native lib dir.
+PRODUCT_PACKAGES += \
+    libQnnHtp_gallery_system_ext \
+    libQnnHtpPrepare_gallery_system_ext \
+    libQnnHtpV81Stub_gallery_system_ext \
+    libQnnHtpV81CalculatorStub_gallery_system_ext \
+    libQnnSaver_gallery_system_ext \
+    libQnnSystem_gallery_system_ext \
+    libQnnHtp_gallery_app_lib \
+    libQnnHtpPrepare_gallery_app_lib \
+    libQnnHtpV81Stub_gallery_app_lib \
+    libQnnHtpV81CalculatorStub_gallery_app_lib \
+    libQnnSaver_gallery_app_lib \
+    libQnnSystem_gallery_app_lib
 
 # Properties
 PRODUCT_PRODUCT_PROPERTIES += \
-    persist.vendor.camera.privapp.list=com.oplus.camera \
+    persist.vendor.camera.privapp.list=* \
+    persist.sys.camera.private.log.enable=debug,pre,mp \
     ro.com.google.lens.oem_camera_package=com.oplus.camera \
-    ro.com.google.lens.oem_image_package=com.oneplus.gallery \
+    ro.com.google.lens.oem_image_package=com.oneplus.gallery,com.oplus.screenshot \
+    ro.build.version.oplusrom=V16.0.0 \
+    ro.build.version.oplusrom.display=16.0 \
+    ro.build.version.oplusrom.confidential=V16.0.0 \
+    ro.camerax.extensions.enabled=true \
     ro.oplus.camera.defercap.support=1 \
     ro.oplus.system.camera.name=com.oplus.camera \
     ro.oplus.camera.defercap.all.quick.visible.support=1 \
     ro.oplus.camera.livephoto.support=1 \
     ro.camera.disableHeicUltraHDR=1 \
     oplus.software.camera.10bit=1 \
-    vendor.camera.aux.packagelist=com.oplus.camera \
+    vendor.camera.aux.packagelist=* \
+    ro.camera.notify_nfc=1 \
     ro.oplus.camera.facing.front.need.disable.nfc=1 \
     ro.oplus.camera.portrait.center.switch=oplus.switch.portrait.center \
     ro.oplus.camera.portrait_center.prefix=oplus.portrait.center. \
@@ -46,6 +77,15 @@ PRODUCT_PRODUCT_PROPERTIES += \
     persist.logd.log.load.vendor.qti.camera.provider-service_64.threshold=400000 \
     persist.logd.log.load.vendor.qti.camera.provider-service_64.upper_limit=1500 \
 
+PRODUCT_VENDOR_PROPERTIES += \
+    ro.camera.enableCamera1MaxZsl=1
+
+PRODUCT_SYSTEM_EXT_PROPERTIES += \
+    ro.build.version.oplus.api=37 \
+    ro.build.version.oplus.sub_api=28 \
+    ro.vendor.oplus.vendorxml.enable=1 \
+    ro.oplus.camera.defercap.support=1
+
 # Photo
 $(call soong_config_set,camera,package_name,com.oplus.packageName)
 
@@ -53,7 +93,7 @@ $(call soong_config_set,camera,package_name,com.oplus.packageName)
 $(call soong_config_set_bool,camera,override_format_from_reserved,true)
 
 # SEpolicy
-include vendor/oplus/camera/sepolicy/SEPolicy.mk
+include vendor/oneplus/camera/sepolicy/SEPolicy.mk
 
 # Inherit from camera-vendor.mk
-$(call inherit-product, vendor/oplus/camera/camera/camera-vendor.mk)
+$(call inherit-product, vendor/oneplus/camera/camera/camera-vendor.mk)
