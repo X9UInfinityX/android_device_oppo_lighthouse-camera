@@ -4,9 +4,10 @@ hal_client_domain(opluscamera_app, vendor_hal_dspmanager)
 
 allow opluscamera_app adsprpcd_file:dir r_dir_perms;
 allow opluscamera_app public_adsprpcd_file:file r_file_perms;
+allow opluscamera_app same_process_hal_file:file r_file_perms;
 
 allow opluscamera_app vendor_data_file:dir  { read open search write add_name remove_name create getattr };
-allow opluscamera_app vendor_data_file:file { read open write create unlink getattr };
+allow opluscamera_app vendor_data_file:file { read open write create unlink getattr rename };
 allow opluscamera_app vendor_camera_update_data_file:file { read open write create unlink getattr };
 allow opluscamera_app vendor_camera_update_data_file:dir { read open search write add_name remove_name create getattr };
 allow opluscamera_app vendor_xdsp_device:file { read open write create unlink getattr };
@@ -50,6 +51,8 @@ allow opluscamera_app display_service:service_manager find;
 allow opluscamera_app surfaceflinger_service:service_manager find;
 allow opluscamera_app package_native_service:service_manager find;
 allow opluscamera_app permission_service:service_manager find;
+allow opluscamera_app vendor_hal_offlinecamera_service:service_manager find;
+allow opluscamera_app hal_system_suspend_service:service_manager find;
 dontaudit opluscamera_app vendor_hal_qspmhal_service:service_manager find;
 
 

@@ -25,9 +25,25 @@ cd vendor/oneplus/camera
 ./extract-files.py /path/to/OP15/dump
 ```
 
+For the local OP15 dump used during this port:
+
+```
+cd ~/android/INFIX/vendor/oneplus/camera
+./extract-files.py ~/Desktop/MIO-KITCHEN/OP15
+```
+
 The extractor reads `proprietary-files.txt`, pulls the listed files from the
 dump, applies the blob fixups in `extract-files.py`, and writes the results to:
 
 ```
 vendor/oneplus/camera/camera/proprietary/
 ```
+
+It also regenerates the generated build files under:
+
+```
+vendor/oneplus/camera/camera/
+```
+
+After changing `proprietary-files.txt`, rerun `./extract-files.py` against the
+OP15 dump before building.

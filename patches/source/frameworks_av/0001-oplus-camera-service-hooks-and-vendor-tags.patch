@@ -1,0 +1,169 @@
+diff --git a/camera/CameraMetadata.cpp b/camera/CameraMetadata.cpp
+index 203f27650c..810fc5d1e4 100644
+--- a/camera/CameraMetadata.cpp
++++ b/camera/CameraMetadata.cpp
+@@ -34,6 +34,24 @@ namespace android {
+ typedef Parcel::WritableBlob WritableBlob;
+ typedef Parcel::ReadableBlob ReadableBlob;
+ 
++struct OplusVendorTagAlias {
++    const char* from;
++    const char* to;
++};
++
++static const OplusVendorTagAlias kOplusVendorTagAliases[] = {
++        // OPlus camera SDK names which are not exposed literally by the OP15 HAL.
++        // Keep this list conservative: only map to tags with the same request intent.
++        {"burst.capture.single", "com.oplus.burst.capture"},
++        {"full.bining.qbc.enable", "com.oplus.quad2binning"},
++        {"rear.remosaic.enable", "com.oplus.QCFARemosaicType"},
++        {"aps.sat.preview.master.pipeline", "com.oplus.aps.sat.snapshot.master.pipeline"},
++        {"control.face.dr", "com.oplus.face.occlusion.info"},
++        {"sensor.exposureTime", "android.sensor.exposureTime"},
++        {"app.filter.type", "com.oplus.FilterType"},
++        {"pdaf.converge.status", "com.oplus.is.pdaf.done"},
++};
++
+ CameraMetadata::CameraMetadata() :
+         mBuffer(NULL), mLocked(false) {
+ }
+@@ -874,10 +892,27 @@ status_t CameraMetadata::getTagFromName(const char *name,
+     } else if (vTags != NULL) {
+         // Match vendor tags (typically com.*)
+         const String8 sectionName(section);
+-        const String8 tagName(nameTagName);
++        String8 tagName(nameTagName);
+ 
+         status_t res = OK;
+         if ((res = vTags->lookupTag(tagName, sectionName, &candidateTag)) != OK) {
++            if (strcmp(section, "com.oplus") == 0) {
++                for (const auto& alias : kOplusVendorTagAliases) {
++                    if (strcmp(nameTagName, alias.from) != 0) {
++                        continue;
++                    }
++
++                    if (CameraMetadata::getTagFromName(alias.to, vTags, &candidateTag) == OK) {
++                        ALOGI("%s: resolved OP15 vendor tag alias %s.%s -> %s",
++                              __FUNCTION__, section, nameTagName, alias.to);
++                        *tag = candidateTag;
++                        return OK;
++                    }
++                }
++            }
++
++            ALOGE("%s: vendor tag lookup failed for %s.%s",
++                  __FUNCTION__, section, nameTagName);
+             return NAME_NOT_FOUND;
+         }
+     }
+diff --git a/services/camera/libcameraservice/Android.bp b/services/camera/libcameraservice/Android.bp
+index 5062e4c673..4175e8ad7a 100644
+--- a/services/camera/libcameraservice/Android.bp
++++ b/services/camera/libcameraservice/Android.bp
+@@ -211,6 +211,8 @@ cc_library {
+         "utils/LatencyHistogram.cpp",
+         "utils/Utils.cpp",
+         "utils/VirtualDeviceCameraIdMapper.cpp",
++        "ext/ICameraServiceExt.cpp",
++        "ext/CameraServiceExtFactory.cpp",
+     ],
+ 
+     header_libs: [
+@@ -244,6 +246,7 @@ cc_library {
+     include_dirs: [
+         "system/media/private/camera/include",
+         "frameworks/native/include/media/openmax",
++        "frameworks/av/services/camera/libcameraservice/ext/include",
+     ],
+ 
+     export_include_dirs: ["."],
+diff --git a/services/camera/libcameraservice/CameraService.cpp b/services/camera/libcameraservice/CameraService.cpp
+index ae4e98453e..24b3d0cde0 100644
+--- a/services/camera/libcameraservice/CameraService.cpp
++++ b/services/camera/libcameraservice/CameraService.cpp
+@@ -91,6 +91,8 @@
+ #include "utils/TagMonitor.h"
+ #include "utils/Utils.h"
+ 
++#include "ext/include/CameraServiceExtFactory.h"
++
+ #ifdef CAMERA_NEEDS_CLIENT_INFO_LIB
+ #include <vendor/oneplus/hardware/camera/1.0/IOnePlusCameraProvider.h>
+ #endif
+@@ -151,7 +153,7 @@ using hardware::camera2::utils::ConcurrentCameraIdCombination;
+ using ::vendor::oneplus::hardware::camera::V1_0::IOnePlusCameraProvider;
+ #endif
+ #ifdef CAMERA_NEEDS_CLIENT_INFO_LIB_OPLUS
+-using ::vendor::oplus::hardware::cameraMDM::V2_0::IOPlusCameraMDM;
++using ::vendor::oplus::hardware::cameraMDM::V1_0::IOPlusCameraMDM;
+ #endif
+ 
+ namespace flags = com::android::internal::camera::flags;
+@@ -262,6 +264,7 @@ void CameraService::onFirstRef()
+     res = enumerateProviders();
+     if (res == OK) {
+         mInitialized = true;
++        CameraServiceExtFactory::setCameraServiceInstance(sp<CameraService>::fromExisting(this));
+     }
+ 
+     mUidPolicy = new UidPolicy(this);
+@@ -4143,6 +4146,7 @@ void CameraService::logServiceError(const std::string &msg, int errorCode) {
+ status_t CameraService::onTransact(uint32_t code, const Parcel& data, Parcel* reply,
+         uint32_t flags) {
+ 
++    ALOGI("CameraService::onTransact: code=0x%x (%d)", code, code);
+     // Permission checks
+     switch (code) {
+         case SHELL_COMMAND_TRANSACTION: {
+@@ -4171,6 +4175,11 @@ status_t CameraService::onTransact(uint32_t code, const Parcel& data, Parcel* re
+         }
+     }
+ 
++    // Let the extension handle it first
++    if (CameraServiceExtFactory::onTransact(code, data, reply, flags) == 0) {
++        return NO_ERROR;
++    }
++
+     return BnCameraService::onTransact(code, data, reply, flags);
+ }
+ 
+diff --git a/services/camera/libcameraservice/common/CameraProviderManager.cpp b/services/camera/libcameraservice/common/CameraProviderManager.cpp
+index 8d8f0e2121..fa468f87e4 100644
+--- a/services/camera/libcameraservice/common/CameraProviderManager.cpp
++++ b/services/camera/libcameraservice/common/CameraProviderManager.cpp
+@@ -59,6 +59,9 @@
+ 
+ #include "common/CameraProviderExtension.h"
+ 
++#include "CameraServiceExtFactory.h"
++#include "ICameraServiceExt.h"
++
+ namespace android {
+ 
+ using namespace ::android::hardware::camera;
+@@ -546,7 +549,11 @@ status_t CameraProviderManager::getCameraCharacteristics(const std::string &id,
+     std::lock_guard<std::mutex> lock(mInterfaceMutex);
+     return getCameraCharacteristicsLocked(id, overrideForPerfClass, characteristics, compatInfo);
+ }
+-
++status_t CameraProviderManager::getCameraCharacteristics( const std::string &id, bool overrideForPerfClass,
++        CameraMetadata* characteristics, int /*unused*/) const {
++    return getCameraCharacteristics(id, overrideForPerfClass, characteristics,
++            CameraCompatibilityInfo());
++}
+ status_t CameraProviderManager::getHighestSupportedVersion(const std::string &id,
+         hardware::hidl_version *v, IPCTransport *transport) {
+     if (v == nullptr || transport == nullptr) {
+diff --git a/services/camera/libcameraservice/common/CameraProviderManager.h b/services/camera/libcameraservice/common/CameraProviderManager.h
+index 40a4254725..a2231d6f26 100644
+--- a/services/camera/libcameraservice/common/CameraProviderManager.h
++++ b/services/camera/libcameraservice/common/CameraProviderManager.h
+@@ -315,6 +315,8 @@ public:
+     status_t getCameraCharacteristics(const std::string &id,
+             bool overrideForPerfClass, CameraMetadata* characteristics,
+             const CameraCompatibilityInfo& compatInfo) const;
++    status_t getCameraCharacteristics(const std::string &id, bool overrideForPerfClass,
++            CameraMetadata* characteristics, int) const;
+ 
+     status_t isConcurrentSessionConfigurationSupported(
+             const std::vector<hardware::camera2::utils::CameraIdAndSessionConfiguration>

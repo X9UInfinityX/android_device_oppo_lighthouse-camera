@@ -1,0 +1,20 @@
+diff --git a/services/camera/libcameraservice/ext/include/ICameraServiceExt.h b/services/camera/libcameraservice/ext/include/ICameraServiceExt.h
+new file mode 100644
+index 0000000000..daf72d5b5d
+--- /dev/null
++++ b/services/camera/libcameraservice/ext/include/ICameraServiceExt.h
+@@ -0,0 +1,14 @@
++#pragma once
++
++namespace android {
++
++    // Empty placeholder class – no members, no base classes.
++    // The real implementation from the extension library will provide its own.
++    class ICameraServiceExt {
++    public:
++        ICameraServiceExt();
++        ~ICameraServiceExt();
++        // No other methods – the real object's vtable will be used.
++    };
++
++} // namespace android

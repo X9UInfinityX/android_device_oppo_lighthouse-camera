@@ -6,11 +6,18 @@
 
      <!-- OPLUS camera unit sdk -->
      <library name = "com.oplus.camera.unit.sdk"
-        file = "/system_ext/framework/com.oplus.camera.unit.sdk.jar" />
+        file = "/system_ext/framework/com.oplus.camera.unit.sdk.jar"
+        dependency = "oplus.camera.stubs" />
      <library name = "com.oppo.camera.unit.sdk"
-        file = "/system_ext/framework/com.oplus.camera.unit.sdk.jar" />
+        file = "/system_ext/framework/com.oplus.camera.unit.sdk.jar"
+        dependency = "oplus.camera.stubs" />
      <library name="androidx.camera.extensions.impl"
         file="/system_ext/framework/androidx.camera.extensions.impl.jar"/>
+
+     <!-- OPlus camera framework wrapper stubs. Kept off bootclasspath and
+          loaded by OplusCamera through its uses-library declaration. -->
+     <library name="oplus.camera.stubs"
+        file="/system_ext/framework/oplus-camera-stubs.jar"/>
 
      <!-- OPLUS appplatform -->
      <privapp-permissions package="com.oplus.appplatform">

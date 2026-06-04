@@ -1,0 +1,26 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: koaan <koaan@users.noreply.github.com>
+Date: Thu, 4 Jun 2026 00:00:00 +0200
+Subject: [PATCH] infiniti: Allow undefined symbols in OP15 libFaceBeautyJni
+
+The OP15 stock libFaceBeautyJni blob references versioned
+AHardwareBuffer symbols. Keep the blob unchanged and allow the prebuilt
+metadata to pass ELF checks.
+---
+ Android.bp | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/Android.bp b/Android.bp
+index 1111111..2222222 100644
+--- a/Android.bp
++++ b/Android.bp
+@@ -13827,6 +13827,7 @@ cc_prebuilt_library_shared {
+         },
+     },
+     compile_multilib: "64",
+     prefer: true,
++    allow_undefined_symbols: true,
+     device_specific: true,
+ }
+-- 
+2.43.0

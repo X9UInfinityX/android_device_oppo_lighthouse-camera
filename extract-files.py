@@ -112,6 +112,136 @@ def blob_fixup_apktool_unpack_full(ctx, file, file_path, *args, tmp_dir=None, **
     ])
 
 
+def blob_fixup_camera_oemlayer_moonlayout_null_guard(ctx, file, file_path, *args, tmp_dir=None, **kwargs):
+    data = Path(file_path).read_bytes()
+    moonlayout_old = bytes.fromhex(
+        # ldur x8, [x29, #-56]
+        'a8835cf8'
+        # ldr w8, [x8, #980]
+        '08d543b9'
+        # subs w8, w8, #0
+        '08010071'
+        # cset w8, ne
+        'e8079f1a'
+    )
+    moonlayout_new = bytes.fromhex(
+        # ldur x8, [x29, #-56]
+        'a8835cf8'
+        # cbz x8, +0x200; skip moon-layout result metadata if GetRequestObject returned null
+        '081000b4'
+        # ldr w8, [x8, #980]
+        '08d543b9'
+        # cset w8, ne
+        'e8079f1a'
+    )
+    if data.count(moonlayout_old) == 1:
+        data = data.replace(moonlayout_old, moonlayout_new, 1)
+    elif data.count(moonlayout_new) != 1:
+        raise ValueError('camera.oemlayer.v2.so moon-layout null-guard pattern not found exactly once')
+
+    remap_old = bytes.fromhex(
+        # ldur x8, [x29, #-16]
+        'a8035ff8'
+        # stur x8, [x29, #-40]
+        'a8831df8'
+        # mov w9, #-1
+        '09008012'
+        # stur w9, [x29, #-24]
+        'a9831eb8'
+        # ldr x8, [x8, #72]
+        '082540f9'
+        # cbnz x8, +0x14
+        'a80000b5'
+    )
+    remap_new = bytes.fromhex(
+        # ldur x8, [x29, #-16]
+        'a8035ff8'
+        # stur x8, [x29, #-40]
+        'a8831df8'
+        # mov w9, #-1
+        '09008012'
+        # stur w9, [x29, #-24]
+        'a9831eb8'
+        # cbz x8, +0xc; return -1 if RemapSeqId was called with a null OTargetBufferManager
+        '680000b4'
+        # cbnz x8, +0x14
+        'a80000b5'
+    )
+    if data.count(remap_old) == 1:
+        data = data.replace(remap_old, remap_new, 1)
+    elif data.count(remap_new) != 1:
+        raise ValueError('camera.oemlayer.v2.so RemapSeqId null-guard pattern not found exactly once')
+
+    lock_release_old = bytes.fromhex(
+        # ldur x8, [x29, #-8]
+        'a8835ff8'
+        # str x8, [sp, #8]
+        'e80700f9'
+        # ldr x0, [x8, #80]
+        '002940f9'
+        # bl Mutex::Lock
+        '4dff0694'
+    )
+    lock_release_new = bytes.fromhex(
+        # ldur x8, [x29, #-8]
+        'a8835ff8'
+        # str x8, [sp, #8]
+        'e80700f9'
+        # cbz x8, +0x3c; return if LockFrameRelease was called with a null OTargetBufferManager
+        'e80100b4'
+        # bl Mutex::Lock
+        '4dff0694'
+    )
+    if data.count(lock_release_old) == 1:
+        data = data.replace(lock_release_old, lock_release_new, 1)
+    elif data.count(lock_release_new) != 1:
+        raise ValueError('camera.oemlayer.v2.so LockFrameRelease null-guard pattern not found exactly once')
+
+    master_frame_list_old = bytes.fromhex(
+        # ldur w1, [x29, #-68]
+        'a1c35bb8'
+        # ldur w2, [x29, #-72]
+        'a2835bb8'
+        # bl GetConsumerList
+        'a3fa0594'
+    )
+    master_frame_list_new = bytes.fromhex(
+        # cbz x0, +0xe4; return the already-initialized empty list if target buffer manager is null
+        '200700b4'
+        # ldur w2, [x29, #-72]
+        'a2835bb8'
+        # bl GetConsumerList
+        'a3fa0594'
+    )
+    if data.count(master_frame_list_old) == 1:
+        data = data.replace(master_frame_list_old, master_frame_list_new, 1)
+    elif data.count(master_frame_list_new) != 1:
+        raise ValueError('camera.oemlayer.v2.so GetMasterBufferFrameList null-guard pattern not found exactly once')
+
+    consumer_list_old = bytes.fromhex(
+        # ldur x8, [x29, #-104]
+        'a88359f8'
+        # ldr x0, [x8, #72]
+        '002540f9'
+        # bl Mutex::Lock
+        '13ee0594'
+    )
+    consumer_list_new = bytes.fromhex(
+        # ldur x8, [x29, #-104]
+        'a88359f8'
+        # cbz x8, +0x400; return the already-initialized empty list if target buffer manager is null
+        '082000b4'
+        # bl Mutex::Lock
+        '13ee0594'
+    )
+    if data.count(consumer_list_old) == 1:
+        data = data.replace(consumer_list_old, consumer_list_new, 1)
+    elif data.count(consumer_list_new) != 1:
+        raise ValueError('camera.oemlayer.v2.so GetConsumerList null-guard pattern not found exactly once')
+
+    Path(file_path).write_bytes(data)
+
+
 def blob_fixup_opluscamera_oppo_component_safe(ctx, file, file_path, *args, tmp_dir=None, **kwargs):
     if tmp_dir is None:
         return
@@ -126,6 +256,25 @@ def blob_fixup_opluscamera_oppo_component_safe(ctx, file, file_path, *args, tmp_
             + permission,
             1,
         )
+        manifest.write_text(data, encoding='utf-8')
+
+
+def blob_fixup_opluscamera_uses_library(ctx, file, file_path, *args, tmp_dir=None, **kwargs):
+    if tmp_dir is None:
+        return
+
+    manifest = Path(tmp_dir) / 'AndroidManifest.xml'
+    data = manifest.read_text(encoding='utf-8') if manifest.exists() else ''
+    if not data or 'oplus.camera.stubs' in data:
+        return
+
+    entry = '        <uses-library android:name="oplus.camera.stubs" android:required="false"/>\n'
+    sdk_entry = '        <uses-library android:name="com.oplus.camera.unit.sdk" android:required="false"/>\n'
+    if sdk_entry in data:
+        data = data.replace(sdk_entry, entry + sdk_entry, 1)
+        manifest.write_text(data, encoding='utf-8')
+    elif '</application>' in data:
+        data = data.replace('</application>', entry + '    </application>', 1)
         manifest.write_text(data, encoding='utf-8')
 
 
@@ -1256,41 +1405,20 @@ def blob_fixup_oplus_camera_framework_shims(ctx, file, file_path, *args, tmp_dir
             'com.oplus.flash.status': 'com.oplus.flashtrigger.state',
             'com.oplus.outflash.flashtype': 'com.oplus.flashtrigger.state',
             'com.oplus.preview.outflash.connected': 'com.oplus.flashtrigger.state',
-            'com.oplus.DolIsStaggerState': 'com.oplus.capture.request.idx',
-            'com.oplus.iris.aperture.switching': 'com.oplus.capture.request.idx',
-            'com.oplus.control.face.dr': 'com.oplus.capture.request.idx',
-            'com.oplus.fallback.stable': 'com.oplus.capture.request.idx',
-            'com.oplus.capture.request.need.preview.stream': 'com.oplus.capture.request.idx',
-            'com.oplus.filter.mode': 'com.oplus.capture.request.idx',
-            'com.oplus.app.filter.type': 'com.oplus.capture.request.idx',
-            'com.oplus.aicolor.rear.enable': 'com.oplus.capture.request.idx',
-            'com.oplus.camera.3d.api.state': 'com.oplus.capture.request.idx',
-            'com.oplus.camera.configure.thermal.level': 'com.oplus.capture.request.idx',
-            'com.oplus.camera.pi.enable': 'com.oplus.capture.request.idx',
-            'com.oplus.camera.pi.enable_list': 'com.oplus.capture.request.idx',
-            'com.oplus.asd.hdr.scope': 'com.oplus.capture.request.idx',
-            'com.oplus.night.se.enable': 'com.oplus.capture.request.idx',
-            'com.oplus.preview.ai.preset.asd.enable': 'com.oplus.capture.request.idx',
+            'com.oplus.facebeauty.custom': 'com.oplus.facebeauty.level',
             'com.oplus.aec.customAE.enable': 'com.oplus.macro.closeup.enable',
-            'com.oplus.lsd.enable': 'com.oplus.capture.request.idx',
-            'com.oplus.only.zoom.change': 'com.oplus.capture.request.idx',
-            'com.oplus.config.aeExposureCompensation': 'com.oplus.capture.request.idx',
-            'com.oplus.naturetone.state': 'com.oplus.capture.request.idx',
-            'com.oplus.hal.fluency': 'com.oplus.capture.request.idx',
-            'com.oplus.double.ois.wirecutoff.detection.sn': 'com.oplus.capture.request.idx',
             'com.oplus.izoom.ability.support': 'com.oplus.aps.zoom.feature',
             'com.oplus.mipiraw.online.bpc': 'com.oplus.capture.mipiraw.online.bpc',
+            'com.oplus.full.bining.qbc.enable': 'com.oplus.camera.is.from.main.menu',
+            'com.oplus.rear.remosaic.enable': 'com.oplus.camera.is.from.main.menu',
+            'com.oplus.burst.capture.single': 'com.oplus.camera.is.from.main.menu',
+            'com.oplus.defer.force.start': 'com.oplus.camera.is.from.main.menu',
+            'com.oplus.flash.snapshot.use.nonzsl': 'com.oplus.camera.is.from.main.menu',
             'com.oplus.algo.visualization.enable': 'com.oplus.multiobj.info.visualization',
             'com.oplus.camera.algo.visualization.enable': 'com.oplus.multiobj.info.visualization',
             'com.oplus.sod.enable': 'com.oplus.sod.touch.region',
-            'com.oplus.process.pid': 'com.oplus.capture.request.idx',
             'com.oplus.caller.package.name': 'com.oplus.packageName',
-            'com.oplus.camera.is.turn.on': 'com.oplus.is.sdk.camera.package',
             'com.oplus.device.orientation': 'com.oplus.preview.orientation',
-            'com.oplus.TR.processing.state': 'com.oplus.capture.request.idx',
-            'com.oplus.capture.request.idx_list': 'com.oplus.capture.request.idx',
-            'com.oplus.facebeauty.custom': 'com.oplus.facebeauty.level',
-            'com.oplus.picture.offset.time': 'com.oplus.capture.request.idx',
         }.items():
             fixed = fixed.replace(old_tag, new_tag)
         fixed = re.sub(
@@ -1375,7 +1503,7 @@ def blob_fixup_oplus_camera_framework_shims(ctx, file, file_path, *args, tmp_dir
             ):
                 fixed = _replace_smali_method(fixed, signature, empty_map_body)
 
-        if False and smali.match('*/com/oplus/ocs/camera/producer/info/CameraCharacteristicsHelper.smali'):
+        if smali.match('*/com/oplus/ocs/camera/producer/info/CameraCharacteristicsHelper.smali'):
             fixed = _replace_smali_method(
                 fixed,
                 'public static getCameraIdType(Ljava/lang/String;)Lcom/oplus/ocs/camera/producer/info/CameraIdType;',
@@ -1566,6 +1694,379 @@ def blob_fixup_oplus_camera_framework_shims(ctx, file, file_path, *args, tmp_dir
 
         if False and smali.match('*/com/oplus/ocs/camera/producer/device/Camera2Impl.smali'):
             fixed = fixed.replace(
+                '.method public openCameraDevice(ILandroid/os/Handler;)V\n'
+                '    .locals 6\n',
+                '.method public openCameraDevice(ILandroid/os/Handler;)V\n'
+                '    .locals 8\n',
+                1,
+            )
+            fixed = fixed.replace(
+                '    invoke-virtual {v1, p1, v3, p2}, Landroid/hardware/camera2/CameraManager;->openCamera(Ljava/lang/String;Landroid/hardware/camera2/CameraDevice$StateCallback;Landroid/os/Handler;)V\n'
+                '\n'
+                '    .line 2919\n',
+                '    const-string v6, "OP15Unit"\n'
+                '\n'
+                '    new-instance v7, Ljava/lang/StringBuilder;\n'
+                '\n'
+                '    const-string v4, "Camera2Impl openCameraDevice requested id="\n'
+                '\n'
+                '    invoke-direct {v7, v4}, Ljava/lang/StringBuilder;-><init>(Ljava/lang/String;)V\n'
+                '\n'
+                '    invoke-virtual {v7, p1}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;\n'
+                '\n'
+                '    invoke-virtual {v7}, Ljava/lang/StringBuilder;->toString()Ljava/lang/String;\n'
+                '\n'
+                '    move-result-object v7\n'
+                '\n'
+                '    invoke-static {v6, v7}, Landroid/util/Log;->e(Ljava/lang/String;Ljava/lang/String;)I\n'
+                '\n'
+                '    move-result v6\n'
+                '\n'
+                '    invoke-virtual {v1, p1, v3, p2}, Landroid/hardware/camera2/CameraManager;->openCamera(Ljava/lang/String;Landroid/hardware/camera2/CameraDevice$StateCallback;Landroid/os/Handler;)V\n'
+                '\n'
+                '    .line 2919\n',
+                1,
+            )
+            fixed = fixed.replace(
+                '    iget-object p0, p0, Lcom/oplus/ocs/camera/producer/device/Camera2Impl;->mDeviceVariable:Landroid/os/ConditionVariable;\n'
+                '\n'
+                '    invoke-virtual {p0}, Landroid/os/ConditionVariable;->block()V\n'
+                '\n'
+                '    return-void\n',
+                '    iget-object p0, p0, Lcom/oplus/ocs/camera/producer/device/Camera2Impl;->mDeviceVariable:Landroid/os/ConditionVariable;\n'
+                '\n'
+                '    invoke-virtual {p0}, Landroid/os/ConditionVariable;->block()V\n'
+                '\n'
+                '    const-string p0, "OP15Unit"\n'
+                '\n'
+                '    const-string p1, "Camera2Impl openCameraDevice block returned"\n'
+                '\n'
+                '    invoke-static {p0, p1}, Landroid/util/Log;->e(Ljava/lang/String;Ljava/lang/String;)I\n'
+                '\n'
+                '    move-result p0\n'
+                '\n'
+                '    return-void\n',
+                1,
+            )
+
+        if False and smali.match('*/com/oplus/ocs/camera/producer/device/Camera2Impl$2.smali'):
+            fixed = fixed.replace(
+                '.method public onOpened(Landroid/hardware/camera2/CameraDevice;)V\n'
+                '    .locals 2\n',
+                '.method public onOpened(Landroid/hardware/camera2/CameraDevice;)V\n'
+                '    .locals 3\n'
+                '\n'
+                '    const-string v0, "OP15Unit"\n'
+                '\n'
+                '    new-instance v1, Ljava/lang/StringBuilder;\n'
+                '\n'
+                '    const-string v2, "Camera2Impl.StateCallback onOpened device="\n'
+                '\n'
+                '    invoke-direct {v1, v2}, Ljava/lang/StringBuilder;-><init>(Ljava/lang/String;)V\n'
+                '\n'
+                '    invoke-virtual {v1, p1}, Ljava/lang/StringBuilder;->append(Ljava/lang/Object;)Ljava/lang/StringBuilder;\n'
+                '\n'
+                '    invoke-virtual {v1}, Ljava/lang/StringBuilder;->toString()Ljava/lang/String;\n'
+                '\n'
+                '    move-result-object v1\n'
+                '\n'
+                '    invoke-static {v0, v1}, Landroid/util/Log;->e(Ljava/lang/String;Ljava/lang/String;)I\n'
+                '\n'
+                '    move-result v0\n',
+                1,
+            )
+
+        if False and smali.match('*/com/oplus/ocs/camera/producer/device/Camera2StateMachineImpl$1.smali'):
+            fixed = fixed.replace(
+                '.method public onOpened(Landroid/hardware/camera2/CameraDevice;)V\n'
+                '    .locals 1\n',
+                '.method public onOpened(Landroid/hardware/camera2/CameraDevice;)V\n'
+                '    .locals 2\n'
+                '\n'
+                '    const-string v0, "OP15Unit"\n'
+                '\n'
+                '    const-string v1, "StateMachine inner onOpened entry"\n'
+                '\n'
+                '    invoke-static {v0, v1}, Landroid/util/Log;->e(Ljava/lang/String;Ljava/lang/String;)I\n'
+                '\n'
+                '    move-result v0\n',
+                1,
+            )
+
+        if False and smali.match('*/com/oplus/ocs/camera/producer/device/Camera2StateMachineImpl$StateMachineHandler.smali'):
+            fixed = fixed.replace(
+                '    invoke-interface {p1, v0, v1}, Lcom/oplus/ocs/camera/producer/device/Camera2Interface;->openCameraDevice(ILandroid/os/Handler;)V\n'
+                '\n'
+                '    .line 375\n',
+                '    invoke-interface {p1, v0, v1}, Lcom/oplus/ocs/camera/producer/device/Camera2Interface;->openCameraDevice(ILandroid/os/Handler;)V\n'
+                '\n'
+                '    const-string p1, "OP15Unit"\n'
+                '\n'
+                '    const-string v0, "StateMachine MSG_OPEN_CAMERA_DEVICE returned from openCameraDevice"\n'
+                '\n'
+                '    invoke-static {p1, v0}, Landroid/util/Log;->e(Ljava/lang/String;Ljava/lang/String;)I\n'
+                '\n'
+                '    move-result p1\n'
+                '\n'
+                '    .line 375\n',
+                1,
+            )
+
+        if smali.match('*/vj/k.smali'):
+            fixed = fixed.replace(
+                '    iget-object p0, p0, Lvj/k;->K:Landroid/os/ConditionVariable;\n'
+                '\n'
+                '    .line 648\n'
+                '    .line 649\n'
+                '    invoke-virtual {p0}, Landroid/os/ConditionVariable;->block()V\n'
+                '\n'
+                '    .line 650\n',
+                '    iget-object p0, p0, Lvj/k;->K:Landroid/os/ConditionVariable;\n'
+                '\n'
+                '    const-string v9, "OP15Preview"\n'
+                '\n'
+                '    new-instance v10, Ljava/lang/StringBuilder;\n'
+                '\n'
+                '    const-string v0, "J waiting K="\n'
+                '\n'
+                '    invoke-direct {v10, v0}, Ljava/lang/StringBuilder;-><init>(Ljava/lang/String;)V\n'
+                '\n'
+                '    invoke-static {p0}, Ljava/lang/System;->identityHashCode(Ljava/lang/Object;)I\n'
+                '\n'
+                '    move-result v0\n'
+                '\n'
+                '    invoke-virtual {v10, v0}, Ljava/lang/StringBuilder;->append(I)Ljava/lang/StringBuilder;\n'
+                '\n'
+                '    invoke-virtual {v10}, Ljava/lang/StringBuilder;->toString()Ljava/lang/String;\n'
+                '\n'
+                '    move-result-object v10\n'
+                '\n'
+                '    invoke-static {v9, v10}, Landroid/util/Log;->e(Ljava/lang/String;Ljava/lang/String;)I\n'
+                '\n'
+                '    move-result v9\n'
+                '\n'
+                '    .line 648\n'
+                '    .line 649\n'
+                '    invoke-virtual {p0}, Landroid/os/ConditionVariable;->block()V\n'
+                '\n'
+                '    const-string v9, "OP15Preview"\n'
+                '\n'
+                '    const-string v10, "J released K"\n'
+                '\n'
+                '    invoke-static {v9, v10}, Landroid/util/Log;->e(Ljava/lang/String;Ljava/lang/String;)I\n'
+                '\n'
+                '    move-result v9\n'
+                '\n'
+                '    .line 650\n',
+                1,
+            )
+
+        if smali.match('*/com/oplus/camera/Camera$h.smali'):
+            fixed = fixed.replace(
+                '.method public final onServiceConnected(Landroid/content/ComponentName;Landroid/os/IBinder;)V\n'
+                '    .locals 3\n',
+                '.method public final onServiceConnected(Landroid/content/ComponentName;Landroid/os/IBinder;)V\n'
+                '    .locals 3\n'
+                '\n'
+                '    const-string v0, "OP15ApsBind"\n'
+                '\n'
+                '    const-string v1, "Camera$h onServiceConnected entry"\n'
+                '\n'
+                '    invoke-static {v0, v1}, Landroid/util/Log;->e(Ljava/lang/String;Ljava/lang/String;)I\n'
+                '\n'
+                '    move-result v0\n',
+                1,
+            )
+            fixed = fixed.replace(
+                '    iget-object p1, p0, Lcom/oplus/camera/CameraManager;->J:Landroid/os/ConditionVariable;\n'
+                '\n'
+                '    .line 106\n'
+                '    .line 107\n'
+                '    invoke-virtual {p1}, Landroid/os/ConditionVariable;->block()V\n'
+                '\n'
+                '    .line 108\n',
+                '    iget-object p1, p0, Lcom/oplus/camera/CameraManager;->J:Landroid/os/ConditionVariable;\n'
+                '\n'
+                '    const-string p2, "OP15ApsBind"\n'
+                '\n'
+                '    const-string v0, "Camera$h waiting CameraManager.J"\n'
+                '\n'
+                '    invoke-static {p2, v0}, Landroid/util/Log;->e(Ljava/lang/String;Ljava/lang/String;)I\n'
+                '\n'
+                '    move-result p2\n'
+                '\n'
+                '    .line 106\n'
+                '    .line 107\n'
+                '    invoke-virtual {p1}, Landroid/os/ConditionVariable;->block()V\n'
+                '\n'
+                '    const-string p1, "OP15ApsBind"\n'
+                '\n'
+                '    const-string p2, "Camera$h CameraManager.J released"\n'
+                '\n'
+                '    invoke-static {p1, p2}, Landroid/util/Log;->e(Ljava/lang/String;Ljava/lang/String;)I\n'
+                '\n'
+                '    move-result p1\n'
+                '\n'
+                '    .line 108\n',
+                1,
+            )
+            fixed = fixed.replace(
+                '    iget-object p1, p1, Lvj/k;->K:Landroid/os/ConditionVariable;\n'
+                '\n'
+                '    .line 120\n'
+                '    .line 121\n'
+                '    invoke-virtual {p1}, Landroid/os/ConditionVariable;->open()V\n'
+                '\n'
+                '    .line 122\n',
+                '    iget-object p1, p1, Lvj/k;->K:Landroid/os/ConditionVariable;\n'
+                '\n'
+                '    const-string v0, "OP15Preview"\n'
+                '\n'
+                '    new-instance p2, Ljava/lang/StringBuilder;\n'
+                '\n'
+                '    const-string v1, "Camera$h opening K="\n'
+                '\n'
+                '    invoke-direct {p2, v1}, Ljava/lang/StringBuilder;-><init>(Ljava/lang/String;)V\n'
+                '\n'
+                '    invoke-static {p1}, Ljava/lang/System;->identityHashCode(Ljava/lang/Object;)I\n'
+                '\n'
+                '    move-result v1\n'
+                '\n'
+                '    invoke-virtual {p2, v1}, Ljava/lang/StringBuilder;->append(I)Ljava/lang/StringBuilder;\n'
+                '\n'
+                '    invoke-virtual {p2}, Ljava/lang/StringBuilder;->toString()Ljava/lang/String;\n'
+                '\n'
+                '    move-result-object p2\n'
+                '\n'
+                '    invoke-static {v0, p2}, Landroid/util/Log;->e(Ljava/lang/String;Ljava/lang/String;)I\n'
+                '\n'
+                '    move-result v0\n'
+                '\n'
+                '    .line 120\n'
+                '    .line 121\n'
+                '    invoke-virtual {p1}, Landroid/os/ConditionVariable;->open()V\n'
+                '\n'
+                '    .line 122\n',
+                1,
+            )
+
+        if smali.match('*/com/oplus/camera/Camera$i.smali'):
+            fixed = fixed.replace(
+                '.method public final run()V\n'
+                '    .locals 4\n',
+                '.method public final run()V\n'
+                '    .locals 4\n'
+                '\n'
+                '    const-string v0, "OP15ApsBind"\n'
+                '\n'
+                '    const-string v1, "Camera$i bind runnable entry"\n'
+                '\n'
+                '    invoke-static {v0, v1}, Landroid/util/Log;->e(Ljava/lang/String;Ljava/lang/String;)I\n'
+                '\n'
+                '    move-result v0\n',
+                1,
+            )
+            fixed = fixed.replace(
+                '    sget-object v2, Lcom/oplus/camera/MyApplication;->d:Landroid/os/ConditionVariable;\n'
+                '\n'
+                '    .line 51\n'
+                '    .line 52\n'
+                '    invoke-virtual {v2}, Landroid/os/ConditionVariable;->block()V\n'
+                '\n'
+                '    .line 53\n',
+                '    const-string v2, "OP15ApsBind"\n'
+                '\n'
+                '    const-string v3, "Camera$i skip MyApplication.d wait before APS bind"\n'
+                '\n'
+                '    invoke-static {v2, v3}, Landroid/util/Log;->e(Ljava/lang/String;Ljava/lang/String;)I\n'
+                '\n'
+                '    move-result v2\n'
+                '\n'
+                '    .line 53\n',
+                1,
+            )
+            fixed = fixed.replace(
+                '    invoke-virtual {p0, v0, v1, v2, v3}, Landroid/content/Context;->bindService(Landroid/content/Intent;ILjava/util/concurrent/Executor;Landroid/content/ServiceConnection;)Z\n'
+                '\n'
+                '    .line 75\n',
+                '    invoke-virtual {p0, v0, v1, v2, v3}, Landroid/content/Context;->bindService(Landroid/content/Intent;ILjava/util/concurrent/Executor;Landroid/content/ServiceConnection;)Z\n'
+                '\n'
+                '    move-result v0\n'
+                '\n'
+                '    const-string v1, "OP15ApsBind"\n'
+                '\n'
+                '    new-instance v2, Ljava/lang/StringBuilder;\n'
+                '\n'
+                '    const-string v3, "Camera$i bindService result="\n'
+                '\n'
+                '    invoke-direct {v2, v3}, Ljava/lang/StringBuilder;-><init>(Ljava/lang/String;)V\n'
+                '\n'
+                '    invoke-virtual {v2, v0}, Ljava/lang/StringBuilder;->append(Z)Ljava/lang/StringBuilder;\n'
+                '\n'
+                '    invoke-virtual {v2}, Ljava/lang/StringBuilder;->toString()Ljava/lang/String;\n'
+                '\n'
+                '    move-result-object v0\n'
+                '\n'
+                '    invoke-static {v1, v0}, Landroid/util/Log;->e(Ljava/lang/String;Ljava/lang/String;)I\n'
+                '\n'
+                '    move-result v0\n'
+                '\n'
+                '    .line 75\n',
+                1,
+            )
+
+        if False and smali.match('*/mj/r3.smali'):
+            fixed = fixed.replace(
+                '    invoke-virtual {p0}, Lmj/r3;->x()V\n'
+                '\n'
+                '    .line 24\n'
+                '    .line 25\n'
+                '    .line 26\n'
+                '    return-void\n',
+                '    invoke-virtual {p0}, Lmj/r3;->x()V\n'
+                '\n'
+                '    iget-object v0, p0, Lmj/r3;->L:Lvj/k;\n'
+                '\n'
+                '    if-eqz v0, :cond_op15_c0_k_done\n'
+                '\n'
+                '    iget-object v0, v0, Lvj/k;->K:Landroid/os/ConditionVariable;\n'
+                '\n'
+                '    if-eqz v0, :cond_op15_c0_k_done\n'
+                '\n'
+                '    const-string v1, "OP15Preview"\n'
+                '\n'
+                '    new-instance v2, Ljava/lang/StringBuilder;\n'
+                '\n'
+                '    const-string p1, "r3.c0 opening K="\n'
+                '\n'
+                '    invoke-direct {v2, p1}, Ljava/lang/StringBuilder;-><init>(Ljava/lang/String;)V\n'
+                '\n'
+                '    invoke-static {v0}, Ljava/lang/System;->identityHashCode(Ljava/lang/Object;)I\n'
+                '\n'
+                '    move-result p1\n'
+                '\n'
+                '    invoke-virtual {v2, p1}, Ljava/lang/StringBuilder;->append(I)Ljava/lang/StringBuilder;\n'
+                '\n'
+                '    invoke-virtual {v2}, Ljava/lang/StringBuilder;->toString()Ljava/lang/String;\n'
+                '\n'
+                '    move-result-object p1\n'
+                '\n'
+                '    invoke-static {v1, p1}, Landroid/util/Log;->e(Ljava/lang/String;Ljava/lang/String;)I\n'
+                '\n'
+                '    move-result p1\n'
+                '\n'
+                '    invoke-virtual {v0}, Landroid/os/ConditionVariable;->open()V\n'
+                '\n'
+                '    :cond_op15_c0_k_done\n'
+                '    .line 24\n'
+                '    .line 25\n'
+                '    .line 26\n'
+                '    return-void\n',
+                1,
+            )
+
+        if False and smali.match('*/com/oplus/ocs/camera/producer/device/Camera2Impl.smali'):
+            fixed = fixed.replace(
                 '    .line 2976\n'
                 '    iget-object p0, p0, Lcom/oplus/ocs/camera/producer/device/Camera2Impl;->mDeviceVariable:Landroid/os/ConditionVariable;\n'
                 '\n'
@@ -1613,7 +2114,7 @@ def blob_fixup_oplus_camera_framework_shims(ctx, file, file_path, *args, tmp_dir
                 '    :cond_0_op15_real_id\n'
                 '    invoke-virtual {p0, v1}, Lcom/oplus/ocs/camera/producer/device/Camera2Impl;->updateOplusParams(Landroid/hardware/camera2/CameraManager;)V\n',
             )
-        if False and smali.match('*/com/oplus/ocs/camera/producer/device/Camera2Impl$2.smali'):
+        if smali.match('*/com/oplus/ocs/camera/producer/device/Camera2Impl$2.smali'):
             fixed = fixed.replace(
                 '.method public onClosed(Landroid/hardware/camera2/CameraDevice;)V\n'
                 '    .locals 2\n',
@@ -1787,6 +2288,54 @@ def blob_fixup_oplus_camera_framework_shims(ctx, file, file_path, *args, tmp_dir
                 '    iget-object p1, p0, Lcom/oplus/ocs/camera/producer/ProducerImpl$DefaultCameraStateCallbackAdapter;->mHandler:Landroid/os/Handler;\n',
             )
 
+        if False and smali.match('*/com/oplus/ocs/camera/producer/ProducerImpl$DefaultCameraStateCallbackAdapter.smali'):
+            fixed = fixed.replace(
+                '    .line 1497\n'
+                '    :try_start_3\n'
+                '    iget-object p1, p0, Lcom/oplus/ocs/camera/producer/ProducerImpl$DefaultCameraStateCallbackAdapter;->mHandler:Landroid/os/Handler;\n'
+                '\n'
+                '    if-eqz p1, :cond_6\n'
+                '\n'
+                '    .line 1498\n'
+                '    new-instance v0, Lcom/oplus/ocs/camera/producer/ProducerImpl$DefaultCameraStateCallbackAdapter$1;\n'
+                '\n'
+                '    invoke-direct {v0, p0}, Lcom/oplus/ocs/camera/producer/ProducerImpl$DefaultCameraStateCallbackAdapter$1;-><init>(Lcom/oplus/ocs/camera/producer/ProducerImpl$DefaultCameraStateCallbackAdapter;)V\n'
+                '\n'
+                '    invoke-virtual {p1, v0}, Landroid/os/Handler;->post(Ljava/lang/Runnable;)Z\n'
+                '\n'
+                '    goto :goto_1\n'
+                '\n'
+                '    .line 1505\n'
+                '    :cond_6\n'
+                '    iget-object p1, p0, Lcom/oplus/ocs/camera/producer/ProducerImpl$DefaultCameraStateCallbackAdapter;->mCameraStateCallbackAdapter:Lcom/oplus/ocs/camera/appinterface/CameraStateCallbackAdapter;\n'
+                '\n'
+                '    iget-object v0, p0, Lcom/oplus/ocs/camera/producer/ProducerImpl$DefaultCameraStateCallbackAdapter;->this$0:Lcom/oplus/ocs/camera/producer/ProducerImpl;\n'
+                '\n'
+                '    invoke-virtual {p1, v0}, Lcom/oplus/ocs/camera/appinterface/CameraStateCallbackAdapter;->onCameraOpened(Lcom/oplus/ocs/camera/appinterface/CameraDeviceInterface;)V\n'
+                '\n'
+                '    .line 1508\n'
+                '    :goto_1\n',
+                '    .line 1497\n'
+                '    :try_start_3\n'
+                '    const-string p1, "OP15Unit"\n'
+                '\n'
+                '    const-string v0, "DefaultAdapter direct onCameraOpened callback"\n'
+                '\n'
+                '    invoke-static {p1, v0}, Landroid/util/Log;->e(Ljava/lang/String;Ljava/lang/String;)I\n'
+                '\n'
+                '    move-result p1\n'
+                '\n'
+                '    iget-object p1, p0, Lcom/oplus/ocs/camera/producer/ProducerImpl$DefaultCameraStateCallbackAdapter;->mCameraStateCallbackAdapter:Lcom/oplus/ocs/camera/appinterface/CameraStateCallbackAdapter;\n'
+                '\n'
+                '    iget-object v0, p0, Lcom/oplus/ocs/camera/producer/ProducerImpl$DefaultCameraStateCallbackAdapter;->this$0:Lcom/oplus/ocs/camera/producer/ProducerImpl;\n'
+                '\n'
+                '    invoke-virtual {p1, v0}, Lcom/oplus/ocs/camera/appinterface/CameraStateCallbackAdapter;->onCameraOpened(Lcom/oplus/ocs/camera/appinterface/CameraDeviceInterface;)V\n'
+                '\n'
+                '    .line 1508\n'
+                '    :goto_1\n',
+                1,
+            )
+
         if smali.match('*/com/oplus/ocs/camera/producer/ProducerImpl.smali'):
             fixed = fixed.replace(
                 '    .line 139\n'
@@ -1808,8 +2357,6 @@ def blob_fixup_oplus_camera_framework_shims(ctx, file, file_path, *args, tmp_dir
                 '    const/4 p5, 0x0\n',
                 1,
             )
-            # Do not replay cached preview or force photo_mode/rear camera here.
-            # Those hacks can keep the display path tied to the old camera during switches.
             fixed = _replace_smali_method(
                 fixed,
                 'public setParameter(Landroid/hardware/camera2/CaptureRequest$Key;Ljava/lang/Object;)V',
@@ -1852,23 +2399,6 @@ def blob_fixup_oplus_camera_framework_shims(ctx, file, file_path, *args, tmp_dir
             )
             # Keep original null-current-mode behavior instead of silently creating
             # a rear photo mode during switch/startPreview.
-
-        if smali.match('*/tk/e0.smali'):
-            fixed = _replace_smali_method(
-                fixed,
-                'public static i()Z',
-                '    .locals 1\n'
-                '\n'
-                '    const/4 v0, 0x0\n'
-                '\n'
-                '    return v0\n',
-            )
-            fixed = _noop_smali_method(fixed, 'public final A(I)V')
-            fixed = _noop_smali_method(fixed, 'public final u(Z)V')
-            fixed = _noop_smali_method(fixed, 'public final z()V')
-
-        if smali.match('*/d9/c.smali'):
-            fixed = _noop_smali_method(fixed, 'public final run()V')
 
         if smali.match('*/wl/h.smali'):
             fixed = _noop_smali_method(fixed, 'public final run()V')
@@ -1927,7 +2457,7 @@ def blob_fixup_oplus_camera_framework_shims(ctx, file, file_path, *args, tmp_dir
                 '.method public final n(IZ)Z\n'
                 '    .locals 6\n',
                 '.method public final n(IZ)Z\n'
-                '    .locals 6\n'
+                '    .locals 8\n'
                 '\n'
                 '    const-string v0, "OP15Switch"\n'
                 '\n'
@@ -1954,26 +2484,712 @@ def blob_fixup_oplus_camera_framework_shims(ctx, file, file_path, *args, tmp_dir
                 '    move-result v0\n',
                 1,
             )
-
-        if smali.match('*/com/oplus/camera/feature/integration/mirror/MirrorOplusEdrUtils.smali'):
-            fixed = _noop_smali_method(fixed, 'static constructor <clinit>()V')
-            fixed = _replace_smali_method(
-                fixed,
-                'public static setEdrAnimDuration(Landroid/view/SurfaceControl;Landroid/view/SurfaceControl$Transaction;II)Z',
-                '    .locals 1\n'
+            fixed = fixed.replace(
+                '    invoke-interface {v2}, Lcom/oplus/camera/b;->a()Z\n'
                 '\n'
-                '    const/4 v0, 0x0\n'
+                '    .line 70\n'
+                '    .line 71\n'
+                '    .line 72\n'
+                '    move-result v0\n'
                 '\n'
-                '    return v0\n',
+                '    .line 73\n',
+                '    invoke-interface {v2}, Lcom/oplus/camera/b;->a()Z\n'
+                '\n'
+                '    .line 70\n'
+                '    .line 71\n'
+                '    .line 72\n'
+                '    move-result v0\n'
+                '\n'
+                '    const-string v6, "OP15Switch"\n'
+                '\n'
+                '    new-instance v7, Ljava/lang/StringBuilder;\n'
+                '\n'
+                '    const-string v3, "DeviceProcessor.n active="\n'
+                '\n'
+                '    invoke-direct {v7, v3}, Ljava/lang/StringBuilder;-><init>(Ljava/lang/String;)V\n'
+                '\n'
+                '    invoke-virtual {v7, v0}, Ljava/lang/StringBuilder;->append(Z)Ljava/lang/StringBuilder;\n'
+                '\n'
+                '    const-string v3, " openType="\n'
+                '\n'
+                '    invoke-virtual {v7, v3}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;\n'
+                '\n'
+                '    invoke-virtual {v7, p1}, Ljava/lang/StringBuilder;->append(I)Ljava/lang/StringBuilder;\n'
+                '\n'
+                '    invoke-virtual {v7}, Ljava/lang/StringBuilder;->toString()Ljava/lang/String;\n'
+                '\n'
+                '    move-result-object v7\n'
+                '\n'
+                '    invoke-static {v6, v7}, Landroid/util/Log;->e(Ljava/lang/String;Ljava/lang/String;)I\n'
+                '\n'
+                '    move-result v6\n'
+                '\n'
+                '    const-string v3, "DeviceProcessor"\n'
+                '\n'
+                '    .line 73\n',
+                1,
             )
-            fixed = _replace_smali_method(
-                fixed,
-                'public static setEdrSdrRatio(Landroid/view/SurfaceControl;Landroid/view/SurfaceControl$Transaction;F)Z',
-                '    .locals 1\n'
+            fixed = fixed.replace(
+                '    invoke-interface {p1}, Ls7/x$h;->Y()J\n'
                 '\n'
-                '    const/4 v0, 0x0\n'
+                '    .line 82\n'
+                '    .line 83\n'
+                '    .line 84\n'
+                '    move-result-wide v4\n'
                 '\n'
-                '    return v0\n',
+                '    .line 85\n',
+                '    invoke-interface {p1}, Ls7/x$h;->Y()J\n'
+                '\n'
+                '    .line 82\n'
+                '    .line 83\n'
+                '    .line 84\n'
+                '    move-result-wide v4\n'
+                '\n'
+                '    const-string v6, "OP15Switch"\n'
+                '\n'
+                '    new-instance v7, Ljava/lang/StringBuilder;\n'
+                '\n'
+                '    const-string p1, "DeviceProcessor.n delay="\n'
+                '\n'
+                '    invoke-direct {v7, p1}, Ljava/lang/StringBuilder;-><init>(Ljava/lang/String;)V\n'
+                '\n'
+                '    invoke-virtual {v7, v4, v5}, Ljava/lang/StringBuilder;->append(J)Ljava/lang/StringBuilder;\n'
+                '\n'
+                '    invoke-virtual {v7}, Ljava/lang/StringBuilder;->toString()Ljava/lang/String;\n'
+                '\n'
+                '    move-result-object v7\n'
+                '\n'
+                '    invoke-static {v6, v7}, Landroid/util/Log;->e(Ljava/lang/String;Ljava/lang/String;)I\n'
+                '\n'
+                '    move-result v6\n'
+                '\n'
+                '    .line 85\n',
+                1,
+            )
+            fixed = fixed.replace(
+                '    invoke-interface {p1, v4, v5, p0}, Lf6/c;->s2(JLjava/lang/Runnable;)V\n'
+                '\n'
+                '    .line 106\n',
+                '    invoke-interface {p1, v4, v5, p0}, Lf6/c;->s2(JLjava/lang/Runnable;)V\n'
+                '\n'
+                '    const-string p0, "OP15Switch"\n'
+                '\n'
+                '    const-string p1, "DeviceProcessor.n scheduled delayed"\n'
+                '\n'
+                '    invoke-static {p0, p1}, Landroid/util/Log;->e(Ljava/lang/String;Ljava/lang/String;)I\n'
+                '\n'
+                '    move-result p0\n'
+                '\n'
+                '    .line 106\n',
+                1,
+            )
+            # Keep the stock app scheduler for immediate opens. Bypassing V5().R0()
+            # can open the new camera device while leaving app-side mode/UI state on
+            # the old camera, which is exactly what OP15 switch logs showed.
+        if smali.match('*/uj/g$c.smali'):
+            fixed = fixed.replace(
+                '.method public final a()V\n'
+                '    .locals 5\n'
+                '\n'
+                '    .line 1\n'
+                '    const-string v0, "DeviceProcessor"\n',
+                '.method public final a()V\n'
+                '    .locals 5\n'
+                '\n'
+                '    const-string v0, "OP15Close"\n'
+                '\n'
+                '    const-string v1, "DeviceProcessor.closeComplete entry"\n'
+                '\n'
+                '    invoke-static {v0, v1}, Landroid/util/Log;->e(Ljava/lang/String;Ljava/lang/String;)I\n'
+                '\n'
+                '    move-result v0\n'
+                '\n'
+                '    .line 1\n'
+                '    const-string v0, "DeviceProcessor"\n',
+                1,
+            )
+            fixed = fixed.replace(
+                '    :cond_2\n'
+                '    return-void\n',
+                '    :cond_2\n'
+                '    const-string v0, "OP15Close"\n'
+                '\n'
+                '    const-string v1, "DeviceProcessor.closeComplete return"\n'
+                '\n'
+                '    invoke-static {v0, v1}, Landroid/util/Log;->e(Ljava/lang/String;Ljava/lang/String;)I\n'
+                '\n'
+                '    move-result v0\n'
+                '\n'
+                '    return-void\n',
+                1,
+            )
+            fixed = fixed.replace(
+                '.method public static g(Luj/g$c;ZIZ)V\n'
+                '    .locals 12\n',
+                '.method public static g(Luj/g$c;ZIZ)V\n'
+                '    .locals 12\n'
+                '\n'
+                '    const-string v10, "OP15Switch"\n'
+                '\n'
+                '    new-instance v11, Ljava/lang/StringBuilder;\n'
+                '\n'
+                '    const-string v0, "responseCameraOpened entry first="\n'
+                '\n'
+                '    invoke-direct {v11, v0}, Ljava/lang/StringBuilder;-><init>(Ljava/lang/String;)V\n'
+                '\n'
+                '    invoke-virtual {v11, p1}, Ljava/lang/StringBuilder;->append(Z)Ljava/lang/StringBuilder;\n'
+                '\n'
+                '    const-string v0, " cameraId="\n'
+                '\n'
+                '    invoke-virtual {v11, v0}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;\n'
+                '\n'
+                '    invoke-virtual {v11, p2}, Ljava/lang/StringBuilder;->append(I)Ljava/lang/StringBuilder;\n'
+                '\n'
+                '    const-string v0, " openedPaused="\n'
+                '\n'
+                '    invoke-virtual {v11, v0}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;\n'
+                '\n'
+                '    invoke-virtual {v11, p3}, Ljava/lang/StringBuilder;->append(Z)Ljava/lang/StringBuilder;\n'
+                '\n'
+                '    invoke-virtual {v11}, Ljava/lang/StringBuilder;->toString()Ljava/lang/String;\n'
+                '\n'
+                '    move-result-object v11\n'
+                '\n'
+                '    invoke-static {v10, v11}, Landroid/util/Log;->e(Ljava/lang/String;Ljava/lang/String;)I\n'
+                '\n'
+                '    move-result v10\n',
+                1,
+            )
+            fixed = fixed.replace(
+                '    invoke-virtual {p0}, Lpj/a;->d()I\n'
+                '\n'
+                '    .line 177\n'
+                '    .line 178\n'
+                '    .line 179\n'
+                '    move-result p0\n'
+                '\n'
+                '    .line 180\n',
+                '    invoke-virtual {p0}, Lpj/a;->d()I\n'
+                '\n'
+                '    .line 177\n'
+                '    .line 178\n'
+                '    .line 179\n'
+                '    move-result p0\n'
+                '\n'
+                '    const-string v10, "OP15Switch"\n'
+                '\n'
+                '    new-instance v11, Ljava/lang/StringBuilder;\n'
+                '\n'
+                '    const-string v8, "responseCameraOpened taskCount="\n'
+                '\n'
+                '    invoke-direct {v11, v8}, Ljava/lang/StringBuilder;-><init>(Ljava/lang/String;)V\n'
+                '\n'
+                '    invoke-virtual {v11, p0}, Ljava/lang/StringBuilder;->append(I)Ljava/lang/StringBuilder;\n'
+                '\n'
+                '    const-string v8, " cameraId="\n'
+                '\n'
+                '    invoke-virtual {v11, v8}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;\n'
+                '\n'
+                '    invoke-virtual {v11, p2}, Ljava/lang/StringBuilder;->append(I)Ljava/lang/StringBuilder;\n'
+                '\n'
+                '    invoke-virtual {v11}, Ljava/lang/StringBuilder;->toString()Ljava/lang/String;\n'
+                '\n'
+                '    move-result-object v11\n'
+                '\n'
+                '    invoke-static {v10, v11}, Landroid/util/Log;->e(Ljava/lang/String;Ljava/lang/String;)I\n'
+                '\n'
+                '    move-result v10\n'
+                '\n'
+                '    .line 180\n',
+                1,
+            )
+            fixed = fixed.replace(
+                '    if-eqz p0, :cond_6\n'
+                '\n'
+                '    .line 191\n',
+                '    const-string v10, "OP15Switch"\n'
+                '\n'
+                '    new-instance v11, Ljava/lang/StringBuilder;\n'
+                '\n'
+                '    const-string v8, "responseCameraOpened taskInfoNull="\n'
+                '\n'
+                '    invoke-direct {v11, v8}, Ljava/lang/StringBuilder;-><init>(Ljava/lang/String;)V\n'
+                '\n'
+                '    if-nez p0, :cond_op15_task_not_null\n'
+                '\n'
+                '    const/4 v8, 0x1\n'
+                '\n'
+                '    goto :goto_op15_task_null_done\n'
+                '\n'
+                '    :cond_op15_task_not_null\n'
+                '    const/4 v8, 0x0\n'
+                '\n'
+                '    :goto_op15_task_null_done\n'
+                '    invoke-virtual {v11, v8}, Ljava/lang/StringBuilder;->append(Z)Ljava/lang/StringBuilder;\n'
+                '\n'
+                '    invoke-virtual {v11}, Ljava/lang/StringBuilder;->toString()Ljava/lang/String;\n'
+                '\n'
+                '    move-result-object v11\n'
+                '\n'
+                '    invoke-static {v10, v11}, Landroid/util/Log;->e(Ljava/lang/String;Ljava/lang/String;)I\n'
+                '\n'
+                '    move-result v10\n'
+                '\n'
+                '    if-eqz p0, :cond_6\n'
+                '\n'
+                '    .line 191\n',
+                1,
+            )
+            fixed = fixed.replace(
+                '    iget-object p0, v7, Lmj/r3;->L:Lvj/k;\n'
+                '\n'
+                '    .line 324\n'
+                '    .line 325\n'
+                '    invoke-virtual {p0, p3}, Lvj/k;->q(Z)V\n',
+                '    const-string v10, "OP15Switch"\n'
+                '\n'
+                '    const-string v11, "responseCameraOpened calling preview q"\n'
+                '\n'
+                '    invoke-static {v10, v11}, Landroid/util/Log;->e(Ljava/lang/String;Ljava/lang/String;)I\n'
+                '\n'
+                '    move-result v10\n'
+                '\n'
+                '    iget-object p0, v7, Lmj/r3;->L:Lvj/k;\n'
+                '\n'
+                '    .line 324\n'
+                '    .line 325\n'
+                '    invoke-virtual {p0, p3}, Lvj/k;->q(Z)V\n',
+                1,
+            )
+            fixed = fixed.replace(
+                '    :cond_14\n'
+                '    const-string p0, "responseCameraOpened, will create session in next task, so drop it!"\n',
+                '    :cond_14\n'
+                '    const-string v10, "OP15Switch"\n'
+                '\n'
+                '    const-string v11, "responseCameraOpened dropping for next task"\n'
+                '\n'
+                '    invoke-static {v10, v11}, Landroid/util/Log;->e(Ljava/lang/String;Ljava/lang/String;)I\n'
+                '\n'
+                '    move-result v10\n'
+                '\n'
+                '    const-string p0, "responseCameraOpened, will create session in next task, so drop it!"\n',
+                1,
+            )
+            fixed = fixed.replace(
+                '.method public final f(Lcom/oplus/ocs/camera/CameraDevice;I)V\n'
+                '    .locals 8\n',
+                '.method public final f(Lcom/oplus/ocs/camera/CameraDevice;I)V\n'
+                '    .locals 10\n',
+                1,
+            )
+            fixed = fixed.replace(
+                '    iget-boolean v0, p0, Luj/g;->w:Z\n'
+                '\n'
+                '    .line 35\n',
+                '    iget-boolean v0, p0, Luj/g;->w:Z\n'
+                '\n'
+                '    const-string v8, "OP15Switch"\n'
+                '\n'
+                '    new-instance v9, Ljava/lang/StringBuilder;\n'
+                '\n'
+                '    const-string v3, "onCameraOpened entry cameraId="\n'
+                '\n'
+                '    invoke-direct {v9, v3}, Ljava/lang/StringBuilder;-><init>(Ljava/lang/String;)V\n'
+                '\n'
+                '    invoke-virtual {v9, p2}, Ljava/lang/StringBuilder;->append(I)Ljava/lang/StringBuilder;\n'
+                '\n'
+                '    const-string v3, " wasPausedOpen="\n'
+                '\n'
+                '    invoke-virtual {v9, v3}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;\n'
+                '\n'
+                '    invoke-virtual {v9, v0}, Ljava/lang/StringBuilder;->append(Z)Ljava/lang/StringBuilder;\n'
+                '\n'
+                '    const-string v3, " openType="\n'
+                '\n'
+                '    invoke-virtual {v9, v3}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;\n'
+                '\n'
+                '    iget v3, p0, Luj/g;->m:I\n'
+                '\n'
+                '    invoke-virtual {v9, v3}, Ljava/lang/StringBuilder;->append(I)Ljava/lang/StringBuilder;\n'
+                '\n'
+                '    invoke-virtual {v9}, Ljava/lang/StringBuilder;->toString()Ljava/lang/String;\n'
+                '\n'
+                '    move-result-object v9\n'
+                '\n'
+                '    invoke-static {v8, v9}, Landroid/util/Log;->e(Ljava/lang/String;Ljava/lang/String;)I\n'
+                '\n'
+                '    move-result v8\n'
+                '\n'
+                '    .line 35\n',
+                1,
+            )
+            fixed = fixed.replace(
+                '    invoke-virtual {p0}, Lsj/a;->d()Z\n'
+                '\n'
+                '    .line 82\n'
+                '    .line 83\n'
+                '    .line 84\n'
+                '    move-result v3\n'
+                '\n'
+                '    .line 85\n',
+                '    invoke-virtual {p0}, Lsj/a;->d()Z\n'
+                '\n'
+                '    .line 82\n'
+                '    .line 83\n'
+                '    .line 84\n'
+                '    move-result v3\n'
+                '\n'
+                '    new-instance v9, Ljava/lang/StringBuilder;\n'
+                '\n'
+                '    const-string v8, "onCameraOpened state isPaused="\n'
+                '\n'
+                '    invoke-direct {v9, v8}, Ljava/lang/StringBuilder;-><init>(Ljava/lang/String;)V\n'
+                '\n'
+                '    invoke-virtual {v9, v3}, Ljava/lang/StringBuilder;->append(Z)Ljava/lang/StringBuilder;\n'
+                '\n'
+                '    const-string v8, " appBlocked="\n'
+                '\n'
+                '    invoke-virtual {v9, v8}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;\n'
+                '\n'
+                '    invoke-virtual {v9, p1}, Ljava/lang/StringBuilder;->append(Z)Ljava/lang/StringBuilder;\n'
+                '\n'
+                '    invoke-virtual {v9}, Ljava/lang/StringBuilder;->toString()Ljava/lang/String;\n'
+                '\n'
+                '    move-result-object v9\n'
+                '\n'
+                '    const-string v8, "OP15Switch"\n'
+                '\n'
+                '    invoke-static {v8, v9}, Landroid/util/Log;->e(Ljava/lang/String;Ljava/lang/String;)I\n'
+                '\n'
+                '    move-result v8\n'
+                '\n'
+                '    .line 85\n',
+                1,
+            )
+            fixed = fixed.replace(
+                '    invoke-static {p0, v4, p2, v0}, Luj/g$c;->g(Luj/g$c;ZIZ)V\n'
+                '\n'
+                '    .line 564\n',
+                '    const-string p1, "OP15Switch"\n'
+                '\n'
+                '    const-string v1, "onCameraOpened call response first=false"\n'
+                '\n'
+                '    invoke-static {p1, v1}, Landroid/util/Log;->e(Ljava/lang/String;Ljava/lang/String;)I\n'
+                '\n'
+                '    move-result p1\n'
+                '\n'
+                '    invoke-static {p0, v4, p2, v0}, Luj/g$c;->g(Luj/g$c;ZIZ)V\n'
+                '\n'
+                '    .line 564\n',
+                1,
+            )
+            fixed = fixed.replace(
+                '    invoke-static {p0, v2, p2, v0}, Luj/g$c;->g(Luj/g$c;ZIZ)V\n'
+                '\n'
+                '    .line 570\n',
+                '    const-string p1, "OP15Switch"\n'
+                '\n'
+                '    const-string v1, "onCameraOpened call response first=true"\n'
+                '\n'
+                '    invoke-static {p1, v1}, Landroid/util/Log;->e(Ljava/lang/String;Ljava/lang/String;)I\n'
+                '\n'
+                '    move-result p1\n'
+                '\n'
+                '    invoke-static {p0, v2, p2, v0}, Luj/g$c;->g(Luj/g$c;ZIZ)V\n'
+                '\n'
+                '    .line 570\n',
+                1,
+            )
+
+        if smali.match('*/s7/b1.smali'):
+            fixed = fixed.replace(
+                '.method public final A(Z)V\n'
+                '    .locals 2\n',
+                '.method public final A(Z)V\n'
+                '    .locals 4\n',
+                1,
+            )
+            fixed = fixed.replace(
+                '    invoke-virtual {p0, v0}, Ls7/b1;->G(Ljava/lang/Runnable;)V\n'
+                '\n'
+                '    .line 36\n',
+                '    const-string v2, "OP15Close"\n'
+                '\n'
+                '    const-string v3, "b1.A scheduling f0 close runnable"\n'
+                '\n'
+                '    invoke-static {v2, v3}, Landroid/util/Log;->e(Ljava/lang/String;Ljava/lang/String;)I\n'
+                '\n'
+                '    move-result v2\n'
+                '\n'
+                '    invoke-virtual {p0, v0}, Ls7/b1;->G(Ljava/lang/Runnable;)V\n'
+                '\n'
+                '    const-string v2, "OP15Close"\n'
+                '\n'
+                '    const-string v3, "b1.A returned from G, waiting n"\n'
+                '\n'
+                '    invoke-static {v2, v3}, Landroid/util/Log;->e(Ljava/lang/String;Ljava/lang/String;)I\n'
+                '\n'
+                '    move-result v2\n'
+                '\n'
+                '    .line 36\n',
+                1,
+            )
+            fixed = fixed.replace(
+                '    invoke-virtual {p0}, Landroid/os/ConditionVariable;->block()V\n'
+                '\n'
+                '    .line 47\n'
+                '    .line 48\n'
+                '    .line 49\n'
+                '    const-string p0, "closeCameraDevice X"\n',
+                '    invoke-virtual {p0}, Landroid/os/ConditionVariable;->block()V\n'
+                '\n'
+                '    const-string p0, "OP15Close"\n'
+                '\n'
+                '    const-string v0, "b1.A n released"\n'
+                '\n'
+                '    invoke-static {p0, v0}, Landroid/util/Log;->e(Ljava/lang/String;Ljava/lang/String;)I\n'
+                '\n'
+                '    move-result p0\n'
+                '\n'
+                '    .line 47\n'
+                '    .line 48\n'
+                '    .line 49\n'
+                '    const-string p0, "closeCameraDevice X"\n',
+                1,
+            )
+            fixed = fixed.replace(
+                '    invoke-virtual {v0, v7}, Landroid/os/Handler;->post(Ljava/lang/Runnable;)Z\n'
+                '\n'
+                '    .line 30\n'
+                '    .line 31\n'
+                '    .line 32\n'
+                '    return-void\n'
+                '.end method',
+                '    invoke-virtual {v0, v7}, Landroid/os/Handler;->post(Ljava/lang/Runnable;)Z\n'
+                '\n'
+                '    move-result v0\n'
+                '\n'
+                '    const-string v1, "OP15Preview"\n'
+                '\n'
+                '    new-instance v2, Ljava/lang/StringBuilder;\n'
+                '\n'
+                '    const-string v3, "b1.W post result="\n'
+                '\n'
+                '    invoke-direct {v2, v3}, Ljava/lang/StringBuilder;-><init>(Ljava/lang/String;)V\n'
+                '\n'
+                '    invoke-virtual {v2, v0}, Ljava/lang/StringBuilder;->append(Z)Ljava/lang/StringBuilder;\n'
+                '\n'
+                '    const-string v3, " operation="\n'
+                '\n'
+                '    invoke-virtual {v2, v3}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;\n'
+                '\n'
+                '    invoke-virtual {v2, p3}, Ljava/lang/StringBuilder;->append(I)Ljava/lang/StringBuilder;\n'
+                '\n'
+                '    const-string v3, " mode="\n'
+                '\n'
+                '    invoke-virtual {v2, v3}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;\n'
+                '\n'
+                '    invoke-virtual {v2, p4}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;\n'
+                '\n'
+                '    invoke-virtual {v2}, Ljava/lang/StringBuilder;->toString()Ljava/lang/String;\n'
+                '\n'
+                '    move-result-object v2\n'
+                '\n'
+                '    invoke-static {v1, v2}, Landroid/util/Log;->e(Ljava/lang/String;Ljava/lang/String;)I\n'
+                '\n'
+                '    move-result v1\n'
+                '\n'
+                '    .line 30\n'
+                '    .line 31\n'
+                '    .line 32\n'
+                '    return-void\n'
+                '.end method',
+                1,
+            )
+
+        if smali.match('*/s7/f0.smali'):
+            fixed = fixed.replace(
+                '.method public final run()V\n'
+                '    .locals 7\n',
+                '.method public final run()V\n'
+                '    .locals 7\n'
+                '\n'
+                '    const-string v3, "OP15Close"\n'
+                '\n'
+                '    const-string v4, "f0.run entry"\n'
+                '\n'
+                '    invoke-static {v3, v4}, Landroid/util/Log;->e(Ljava/lang/String;Ljava/lang/String;)I\n'
+                '\n'
+                '    move-result v3\n',
+                1,
+            )
+            fixed = fixed.replace(
+                '    iget-object v1, v0, Ls7/b1;->q:Landroid/os/ConditionVariable;\n'
+                '\n'
+                '    .line 6\n'
+                '    .line 7\n'
+                '    invoke-virtual {v1}, Landroid/os/ConditionVariable;->block()V\n'
+                '\n'
+                '    .line 8\n',
+                '    iget-object v1, v0, Ls7/b1;->q:Landroid/os/ConditionVariable;\n'
+                '\n'
+                '    const-string v3, "OP15Close"\n'
+                '\n'
+                '    const-string v4, "f0 waiting q"\n'
+                '\n'
+                '    invoke-static {v3, v4}, Landroid/util/Log;->e(Ljava/lang/String;Ljava/lang/String;)I\n'
+                '\n'
+                '    move-result v3\n'
+                '\n'
+                '    .line 6\n'
+                '    .line 7\n'
+                '    invoke-virtual {v1}, Landroid/os/ConditionVariable;->block()V\n'
+                '\n'
+                '    const-string v3, "OP15Close"\n'
+                '\n'
+                '    const-string v4, "f0 q released, closing device"\n'
+                '\n'
+                '    invoke-static {v3, v4}, Landroid/util/Log;->e(Ljava/lang/String;Ljava/lang/String;)I\n'
+                '\n'
+                '    move-result v3\n'
+                '\n'
+                '    .line 8\n',
+                1,
+            )
+            fixed = fixed.replace(
+                '    invoke-virtual {v0, v3, p0}, Lcom/oplus/ocs/camera/CameraDevice;->close(ZZ)V\n'
+                '\n'
+                '    .line 52\n',
+                '    invoke-virtual {v0, v3, p0}, Lcom/oplus/ocs/camera/CameraDevice;->close(ZZ)V\n'
+                '\n'
+                '    const-string p0, "OP15Close"\n'
+                '\n'
+                '    const-string v0, "f0 returned from CameraDevice.close"\n'
+                '\n'
+                '    invoke-static {p0, v0}, Landroid/util/Log;->e(Ljava/lang/String;Ljava/lang/String;)I\n'
+                '\n'
+                '    move-result p0\n'
+                '\n'
+                '    .line 52\n',
+                1,
+            )
+
+        if smali.match('*/s7/g0.smali'):
+            fixed = fixed.replace(
+                '.method public final run()V\n'
+                '    .locals 15\n',
+                '.method public final run()V\n'
+                '    .locals 15\n'
+                '\n'
+                '    const-string v13, "OP15Preview"\n'
+                '\n'
+                '    const-string v14, "g0 run entry"\n'
+                '\n'
+                '    invoke-static {v13, v14}, Landroid/util/Log;->e(Ljava/lang/String;Ljava/lang/String;)I\n'
+                '\n'
+                '    move-result v13\n',
+                1,
+            )
+            fixed = fixed.replace(
+                '    iget-object v6, v0, Ls7/b1;->o:Landroid/os/ConditionVariable;\n'
+                '\n'
+                '    .line 387\n'
+                '    .line 388\n'
+                '    invoke-virtual {v6}, Landroid/os/ConditionVariable;->block()V\n'
+                '\n'
+                '    .line 389\n',
+                '    iget-object v6, v0, Ls7/b1;->o:Landroid/os/ConditionVariable;\n'
+                '\n'
+                '    const-string v13, "OP15Preview"\n'
+                '\n'
+                '    const-string v14, "g0 waiting session configured"\n'
+                '\n'
+                '    invoke-static {v13, v14}, Landroid/util/Log;->e(Ljava/lang/String;Ljava/lang/String;)I\n'
+                '\n'
+                '    move-result v13\n'
+                '\n'
+                '    .line 387\n'
+                '    .line 388\n'
+                '    invoke-virtual {v6}, Landroid/os/ConditionVariable;->block()V\n'
+                '\n'
+                '    const-string v13, "OP15Preview"\n'
+                '\n'
+                '    const-string v14, "g0 session configured released"\n'
+                '\n'
+                '    invoke-static {v13, v14}, Landroid/util/Log;->e(Ljava/lang/String;Ljava/lang/String;)I\n'
+                '\n'
+                '    move-result v13\n'
+                '\n'
+                '    .line 389\n',
+                1,
+            )
+
+        if smali.match('*/uj/b.smali'):
+            fixed = fixed.replace(
+                '.method public final run()V\n'
+                '    .locals 13\n',
+                '.method public final run()V\n'
+                '    .locals 13\n'
+                '\n'
+                '    const-string v9, "OP15Switch"\n'
+                '\n'
+                '    const-string v10, "OpenRunnable.run entry"\n'
+                '\n'
+                '    invoke-static {v9, v10}, Landroid/util/Log;->e(Ljava/lang/String;Ljava/lang/String;)I\n'
+                '\n'
+                '    move-result v9\n',
+                1,
+            )
+            fixed = fixed.replace(
+                '    new-instance v9, Luj/e;\n'
+                '\n'
+                '    .line 166\n',
+                '    const-string v9, "OP15Switch"\n'
+                '\n'
+                '    new-instance v10, Ljava/lang/StringBuilder;\n'
+                '\n'
+                '    const-string v11, "OpenRunnable resolved cameraId="\n'
+                '\n'
+                '    invoke-direct {v10, v11}, Ljava/lang/StringBuilder;-><init>(Ljava/lang/String;)V\n'
+                '\n'
+                '    invoke-virtual {v10, v4}, Ljava/lang/StringBuilder;->append(I)Ljava/lang/StringBuilder;\n'
+                '\n'
+                '    const-string v11, " openType="\n'
+                '\n'
+                '    invoke-virtual {v10, v11}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;\n'
+                '\n'
+                '    invoke-virtual {v10, v1}, Ljava/lang/StringBuilder;->append(I)Ljava/lang/StringBuilder;\n'
+                '\n'
+                '    invoke-virtual {v10}, Ljava/lang/StringBuilder;->toString()Ljava/lang/String;\n'
+                '\n'
+                '    move-result-object v10\n'
+                '\n'
+                '    invoke-static {v9, v10}, Landroid/util/Log;->e(Ljava/lang/String;Ljava/lang/String;)I\n'
+                '\n'
+                '    move-result v9\n'
+                '\n'
+                '    new-instance v9, Luj/e;\n'
+                '\n'
+                '    .line 166\n',
+                1,
+            )
+            fixed = fixed.replace(
+                '    invoke-interface {p0, v4, v3}, Ls7/x$c;->s(ILs7/x$d;)V\n'
+                '\n'
+                '    .line 346\n',
+                '    invoke-interface {p0, v4, v3}, Ls7/x$c;->s(ILs7/x$d;)V\n'
+                '\n'
+                '    const-string p0, "OP15Switch"\n'
+                '\n'
+                '    const-string v3, "OpenRunnable requested camera open"\n'
+                '\n'
+                '    invoke-static {p0, v3}, Landroid/util/Log;->e(Ljava/lang/String;Ljava/lang/String;)I\n'
+                '\n'
+                '    move-result p0\n'
+                '\n'
+                '    .line 346\n',
+                1,
             )
 
         if smali.match('*/t5/x0.smali'):
@@ -2061,6 +3277,29 @@ def blob_fixup_oplus_camera_framework_shims(ctx, file, file_path, *args, tmp_dir
                 r'\1move v0, v1\n\n    .line 1065\n',
                 fixed,
                 count=1,
+            )
+
+        if smali.match('*/tk/g.smali'):
+            fixed = fixed.replace(
+                '    :cond_c\n'
+                '    :goto_4\n'
+                '    iget-boolean p1, p0, Ltk/g;->S0:Z\n'
+                '\n'
+                '    .line 213\n'
+                '    .line 214\n'
+                '    if-eqz p1, :cond_f\n'
+                '\n'
+                '    .line 215\n',
+                '    :cond_c\n'
+                '    :goto_4\n'
+                '    const/4 p1, 0x1\n'
+                '\n'
+                '    .line 213\n'
+                '    .line 214\n'
+                '    if-eqz p1, :cond_f\n'
+                '\n'
+                '    .line 215\n',
+                1,
             )
 
         if smali.match('*/mm/d2.smali') or smali.match('*/mm/h2.smali') or smali.match('*/ai/a.smali'):
@@ -2421,32 +3660,579 @@ def blob_fixup_oplus_camera_framework_shims(ctx, file, file_path, *args, tmp_dir
                 1,
             )
 
-        if False and smali.match('*/com/oplus/ocs/camera/CameraStateCallbackAdapterV2.smali'):
+        if smali.match('*/com/oplus/ocs/camera/CameraStateCallbackAdapterV2.smali'):
             fixed = _replace_smali_method(
                 fixed,
                 'public onCameraOpened(Lcom/oplus/ocs/camera/appinterface/CameraDeviceInterface;)V',
-                '    .locals 2\n'
+                '    .locals 4\n'
                 '\n'
                 '    invoke-super {p0, p1}, Lcom/oplus/ocs/camera/appinterface/CameraStateCallbackAdapter;->onCameraOpened(Lcom/oplus/ocs/camera/appinterface/CameraDeviceInterface;)V\n'
                 '\n'
+                '    const-string v0, "OP15Unit"\n'
+                '\n'
+                '    new-instance v1, Ljava/lang/StringBuilder;\n'
+                '\n'
+                '    const-string v2, "V2 onCameraOpened legacyCallback="\n'
+                '\n'
+                '    invoke-direct {v1, v2}, Ljava/lang/StringBuilder;-><init>(Ljava/lang/String;)V\n'
+                '\n'
+                '    iget-object v2, p0, Lcom/oplus/ocs/camera/CameraStateCallbackAdapterV2;->mCameraStateCallback:Lcom/oplus/ocs/camera/CameraStateCallback;\n'
+                '\n'
+                '    if-eqz v2, :cond_op15_null_callback\n'
+                '\n'
+                '    invoke-virtual {v2}, Ljava/lang/Object;->getClass()Ljava/lang/Class;\n'
+                '\n'
+                '    move-result-object v3\n'
+                '\n'
+                '    invoke-virtual {v3}, Ljava/lang/Class;->getName()Ljava/lang/String;\n'
+                '\n'
+                '    move-result-object v3\n'
+                '\n'
+                '    goto :goto_op15_log_callback\n'
+                '\n'
+                '    :cond_op15_null_callback\n'
+                '    const-string v3, "null"\n'
+                '\n'
+                '    :goto_op15_log_callback\n'
+                '    invoke-virtual {v1, v3}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;\n'
+                '\n'
+                '    invoke-virtual {v1}, Ljava/lang/StringBuilder;->toString()Ljava/lang/String;\n'
+                '\n'
+                '    move-result-object v1\n'
+                '\n'
+                '    invoke-static {v0, v1}, Landroid/util/Log;->e(Ljava/lang/String;Ljava/lang/String;)I\n'
+                '\n'
+                '    move-result v0\n'
+                '\n'
                 '    iget-object p0, p0, Lcom/oplus/ocs/camera/CameraStateCallbackAdapterV2;->mCameraStateCallback:Lcom/oplus/ocs/camera/CameraStateCallback;\n'
-                '\n'
-                '    new-instance v1, Lcom/oplus/ocs/camera/CameraDeviceAdapterV2;\n'
-                '\n'
-                '    invoke-direct {v1, p1}, Lcom/oplus/ocs/camera/CameraDeviceAdapterV2;-><init>(Lcom/oplus/ocs/camera/appinterface/CameraDeviceInterface;)V\n'
                 '\n'
                 '    if-eqz p0, :cond_0\n'
                 '\n'
                 '    new-instance v0, Lcom/oplus/ocs/camera/CameraDevice;\n'
+                '\n'
+                '    new-instance v1, Lcom/oplus/ocs/camera/CameraDeviceAdapterV2;\n'
+                '\n'
+                '    invoke-direct {v1, p1}, Lcom/oplus/ocs/camera/CameraDeviceAdapterV2;-><init>(Lcom/oplus/ocs/camera/appinterface/CameraDeviceInterface;)V\n'
                 '\n'
                 '    invoke-direct {v0, v1}, Lcom/oplus/ocs/camera/CameraDevice;-><init>(Lcom/oplus/ocs/camera/CameraDeviceAdapter;)V\n'
                 '\n'
                 '    invoke-virtual {p0, v0}, Lcom/oplus/ocs/camera/CameraStateCallback;->onCameraOpened(Lcom/oplus/ocs/camera/CameraDevice;)V\n'
                 '\n'
                 '    :cond_0\n'
-                '    invoke-virtual {v1}, Lcom/oplus/ocs/camera/CameraDeviceAdapterV2;->op15ReplayCachedPreview()V\n'
-                '\n'
                 '    return-void\n',
+            )
+
+        if smali.match('*/androidx/window/layout/a.smali'):
+            fixed = fixed.replace(
+                '    :pswitch_c\n'
+                '    iget-object v0, p0, Landroidx/window/layout/a;->b:Ljava/lang/Object;\n',
+                '    :pswitch_c\n'
+                '    const-string v13, "OP15Switch"\n'
+                '\n'
+                '    const-string v14, "layout/a camera-open runnable entry"\n'
+                '\n'
+                '    invoke-static {v13, v14}, Landroid/util/Log;->e(Ljava/lang/String;Ljava/lang/String;)I\n'
+                '\n'
+                '    move-result v13\n'
+                '\n'
+                '    iget-object v0, p0, Landroidx/window/layout/a;->b:Ljava/lang/Object;\n',
+                1,
+            )
+            fixed = fixed.replace(
+                '    iget-object v1, v0, Ls7/c1;->b:Ls7/b1;\n'
+                '\n'
+                '    .line 1450\n'
+                '    .line 1451\n'
+                '    iget-object v1, v1, Ls7/b1;->b:Ls7/v;\n'
+                '\n'
+                '    .line 1452\n'
+                '    .line 1453\n'
+                '    if-eqz v1, :cond_19\n',
+                '    iget-object v1, v0, Ls7/c1;->b:Ls7/b1;\n'
+                '\n'
+                '    .line 1450\n'
+                '    .line 1451\n'
+                '    iget-object v1, v1, Ls7/b1;->b:Ls7/v;\n'
+                '\n'
+                '    .line 1452\n'
+                '    .line 1453\n'
+                '    if-eqz v1, :cond_op15_layout_null_device\n'
+                '\n'
+                '    goto :goto_op15_layout_has_device\n'
+                '\n'
+                '    :cond_op15_layout_null_device\n'
+                '    const-string v13, "OP15Switch"\n'
+                '\n'
+                '    const-string v14, "layout/a skip: b1 camera wrapper is null"\n'
+                '\n'
+                '    invoke-static {v13, v14}, Landroid/util/Log;->e(Ljava/lang/String;Ljava/lang/String;)I\n'
+                '\n'
+                '    move-result v13\n'
+                '\n'
+                '    goto :cond_19\n'
+                '\n'
+                '    :goto_op15_layout_has_device\n',
+                1,
+            )
+            fixed = fixed.replace(
+                '    iget v0, v0, Ls7/b1;->t:I\n'
+                '\n'
+                '    .line 1460\n'
+                '    .line 1461\n'
+                '    invoke-interface {v1, p0, v0}, Ls7/x$d;->f(Lcom/oplus/ocs/camera/CameraDevice;I)V\n',
+                '    iget v0, v0, Ls7/b1;->t:I\n'
+                '\n'
+                '    const-string v13, "OP15Switch"\n'
+                '\n'
+                '    new-instance v14, Ljava/lang/StringBuilder;\n'
+                '\n'
+                '    const-string v12, "layout/a dispatch app onCameraOpened cameraId="\n'
+                '\n'
+                '    invoke-direct {v14, v12}, Ljava/lang/StringBuilder;-><init>(Ljava/lang/String;)V\n'
+                '\n'
+                '    invoke-virtual {v14, v0}, Ljava/lang/StringBuilder;->append(I)Ljava/lang/StringBuilder;\n'
+                '\n'
+                '    invoke-virtual {v14}, Ljava/lang/StringBuilder;->toString()Ljava/lang/String;\n'
+                '\n'
+                '    move-result-object v14\n'
+                '\n'
+                '    invoke-static {v13, v14}, Landroid/util/Log;->e(Ljava/lang/String;Ljava/lang/String;)I\n'
+                '\n'
+                '    move-result v13\n'
+                '\n'
+                '    .line 1460\n'
+                '    .line 1461\n'
+                '    invoke-interface {v1, p0, v0}, Ls7/x$d;->f(Lcom/oplus/ocs/camera/CameraDevice;I)V\n',
+                1,
+            )
+
+        if smali.match('*/s7/c1.smali'):
+            fixed = fixed.replace(
+                '.method public final onCameraOpened(Lcom/oplus/ocs/camera/CameraDevice;)V\n'
+                '    .locals 4\n',
+                '.method public final onCameraOpened(Lcom/oplus/ocs/camera/CameraDevice;)V\n'
+                '    .locals 6\n',
+                1,
+            )
+            fixed = fixed.replace(
+                '.method public final onCameraClosed()V\n'
+                '    .locals 5\n',
+                '.method public final onCameraClosed()V\n'
+                '    .locals 5\n'
+                '\n'
+                '    const-string v0, "OP15Close"\n'
+                '\n'
+                '    const-string v1, "c1.onCameraClosed entry"\n'
+                '\n'
+                '    invoke-static {v0, v1}, Landroid/util/Log;->e(Ljava/lang/String;Ljava/lang/String;)I\n'
+                '\n'
+                '    move-result v0\n',
+                1,
+            )
+            fixed = fixed.replace(
+                '    iget-object p0, v3, Ls7/b1;->p:Landroid/os/ConditionVariable;\n'
+                '\n'
+                '    .line 67\n'
+                '    .line 68\n'
+                '    invoke-virtual {p0}, Landroid/os/ConditionVariable;->open()V\n'
+                '\n'
+                '    .line 69\n',
+                '    iget-object p0, v3, Ls7/b1;->p:Landroid/os/ConditionVariable;\n'
+                '\n'
+                '    .line 67\n'
+                '    .line 68\n'
+                '    invoke-virtual {p0}, Landroid/os/ConditionVariable;->open()V\n'
+                '\n'
+                '    const-string p0, "OP15Close"\n'
+                '\n'
+                '    const-string v1, "c1.onCameraClosed opened n/o/p"\n'
+                '\n'
+                '    invoke-static {p0, v1}, Landroid/util/Log;->e(Ljava/lang/String;Ljava/lang/String;)I\n'
+                '\n'
+                '    move-result p0\n'
+                '\n'
+                '    .line 69\n',
+                1,
+            )
+            fixed = fixed.replace(
+                '.method public final onSessionConfigured()V\n'
+                '    .locals 3\n',
+                '.method public final onSessionConfigured()V\n'
+                '    .locals 3\n'
+                '\n'
+                '    const-string v1, "OP15Preview"\n'
+                '\n'
+                '    const-string v2, "c1 onSessionConfigured opens b1.o"\n'
+                '\n'
+                '    invoke-static {v1, v2}, Landroid/util/Log;->e(Ljava/lang/String;Ljava/lang/String;)I\n'
+                '\n'
+                '    move-result v1\n',
+                1,
+            )
+            fixed = fixed.replace(
+                '    iput v1, v0, Ls7/b1;->t:I\n'
+                '\n'
+                '    .line 47\n'
+                '    .line 48\n'
+                '    new-instance v1, Landroidx/window/embedding/c;\n'
+                '\n'
+                '    .line 49\n'
+                '    .line 50\n'
+                '    invoke-direct {v1, v2, p0, p1}, Landroidx/window/embedding/c;-><init>(ILjava/lang/Object;Ljava/lang/Object;)V\n'
+                '\n'
+                '    .line 51\n'
+                '    .line 52\n'
+                '    .line 53\n'
+                '    invoke-virtual {v0, v1}, Ls7/b1;->G(Ljava/lang/Runnable;)V\n'
+                '\n'
+                '    .line 54\n'
+                '    .line 55\n'
+                '    .line 56\n'
+                '    iget-object v1, v0, Ls7/b1;->v:Ls7/b1$a;\n'
+                '\n'
+                '    .line 57\n'
+                '    .line 58\n'
+                '    invoke-virtual {v1}, Lx6/c;->d()Landroid/os/Handler;\n'
+                '\n'
+                '    .line 59\n'
+                '    .line 60\n'
+                '    .line 61\n'
+                '    move-result-object v1\n'
+                '\n'
+                '    .line 62\n'
+                '    new-instance v3, Landroidx/window/layout/a;\n'
+                '\n'
+                '    .line 63\n'
+                '    .line 64\n'
+                '    invoke-direct {v3, v2, p0, p1}, Landroidx/window/layout/a;-><init>(ILjava/lang/Object;Ljava/lang/Object;)V\n'
+                '\n'
+                '    .line 65\n'
+                '    .line 66\n'
+                '    .line 67\n'
+                '    invoke-virtual {v1, v3}, Landroid/os/Handler;->post(Ljava/lang/Runnable;)Z\n'
+                '\n'
+                '    .line 68\n',
+                '    iput v1, v0, Ls7/b1;->t:I\n'
+                '\n'
+                '    .line 47\n'
+                '    .line 48\n'
+                '    new-instance v1, Landroidx/window/embedding/c;\n'
+                '\n'
+                '    invoke-direct {v1, v2, p0, p1}, Landroidx/window/embedding/c;-><init>(ILjava/lang/Object;Ljava/lang/Object;)V\n'
+                '\n'
+                '    invoke-virtual {v0, v1}, Ls7/b1;->G(Ljava/lang/Runnable;)V\n'
+                '\n'
+                '    const-string v1, "OP15Switch"\n'
+                '\n'
+                '    const-string v3, "c1 initialized b1.G before camera-open dispatch"\n'
+                '\n'
+                '    invoke-static {v1, v3}, Landroid/util/Log;->e(Ljava/lang/String;Ljava/lang/String;)I\n'
+                '\n'
+                '    move-result v1\n'
+                '\n'
+                '    iget-object v1, v0, Ls7/b1;->v:Ls7/b1$a;\n'
+                '\n'
+                '    invoke-virtual {v1}, Lx6/c;->d()Landroid/os/Handler;\n'
+                '\n'
+                '    move-result-object v1\n'
+                '\n'
+                '    new-instance v3, Landroidx/window/layout/a;\n'
+                '\n'
+                '    invoke-direct {v3, v2, p0, p1}, Landroidx/window/layout/a;-><init>(ILjava/lang/Object;Ljava/lang/Object;)V\n'
+                '\n'
+                '    invoke-virtual {v1, v3}, Landroid/os/Handler;->post(Ljava/lang/Runnable;)Z\n'
+                '\n'
+                '    move-result v3\n'
+                '\n'
+                '    const-string v4, "OP15Switch"\n'
+                '\n'
+                '    new-instance v5, Ljava/lang/StringBuilder;\n'
+                '\n'
+                '    const-string p0, "c1 posted layout/a result="\n'
+                '\n'
+                '    invoke-direct {v5, p0}, Ljava/lang/StringBuilder;-><init>(Ljava/lang/String;)V\n'
+                '\n'
+                '    invoke-virtual {v5, v3}, Ljava/lang/StringBuilder;->append(Z)Ljava/lang/StringBuilder;\n'
+                '\n'
+                '    const-string p0, " handler="\n'
+                '\n'
+                '    invoke-virtual {v5, p0}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;\n'
+                '\n'
+                '    invoke-virtual {v5, v1}, Ljava/lang/StringBuilder;->append(Ljava/lang/Object;)Ljava/lang/StringBuilder;\n'
+                '\n'
+                '    const-string p0, " looper="\n'
+                '\n'
+                '    invoke-virtual {v5, p0}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;\n'
+                '\n'
+                '    invoke-virtual {v1}, Landroid/os/Handler;->getLooper()Landroid/os/Looper;\n'
+                '\n'
+                '    move-result-object p0\n'
+                '\n'
+                '    invoke-virtual {v5, p0}, Ljava/lang/StringBuilder;->append(Ljava/lang/Object;)Ljava/lang/StringBuilder;\n'
+                '\n'
+                '    invoke-virtual {v5}, Ljava/lang/StringBuilder;->toString()Ljava/lang/String;\n'
+                '\n'
+                '    move-result-object p0\n'
+                '\n'
+                '    invoke-static {v4, p0}, Landroid/util/Log;->e(Ljava/lang/String;Ljava/lang/String;)I\n'
+                '\n'
+                '    move-result p0\n'
+                '\n'
+                '    .line 68\n',
+                1,
+            )
+
+        if smali.match('*/s7/c1$a.smali'):
+            fixed = fixed.replace(
+                '.method public final run()V\n'
+                '    .locals 0\n'
+                '\n'
+                '    .line 1\n'
+                '    iget-object p0, p0, Ls7/c1$a;->a:Ls7/c1;\n'
+                '\n'
+                '    .line 2\n'
+                '    .line 3\n'
+                '    iget-object p0, p0, Ls7/c1;->b:Ls7/b1;\n'
+                '\n'
+                '    .line 4\n'
+                '    .line 5\n'
+                '    iget-object p0, p0, Ls7/b1;->z:Ls7/x$d;\n'
+                '\n'
+                '    .line 6\n'
+                '    .line 7\n'
+                '    invoke-interface {p0}, Ls7/x$d;->a()V\n'
+                '\n'
+                '    .line 8\n'
+                '    .line 9\n'
+                '    .line 10\n'
+                '    return-void\n'
+                '.end method',
+                '.method public final run()V\n'
+                '    .locals 2\n'
+                '\n'
+                '    const-string v0, "OP15Close"\n'
+                '\n'
+                '    const-string v1, "c1$a run entry"\n'
+                '\n'
+                '    invoke-static {v0, v1}, Landroid/util/Log;->e(Ljava/lang/String;Ljava/lang/String;)I\n'
+                '\n'
+                '    move-result v0\n'
+                '\n'
+                '    .line 1\n'
+                '    iget-object p0, p0, Ls7/c1$a;->a:Ls7/c1;\n'
+                '\n'
+                '    .line 2\n'
+                '    .line 3\n'
+                '    iget-object p0, p0, Ls7/c1;->b:Ls7/b1;\n'
+                '\n'
+                '    .line 4\n'
+                '    .line 5\n'
+                '    iget-object p0, p0, Ls7/b1;->z:Ls7/x$d;\n'
+                '\n'
+                '    const-string v0, "OP15Close"\n'
+                '\n'
+                '    const-string v1, "c1$a before z.a"\n'
+                '\n'
+                '    invoke-static {v0, v1}, Landroid/util/Log;->e(Ljava/lang/String;Ljava/lang/String;)I\n'
+                '\n'
+                '    move-result v0\n'
+                '\n'
+                '    .line 6\n'
+                '    .line 7\n'
+                '    invoke-interface {p0}, Ls7/x$d;->a()V\n'
+                '\n'
+                '    const-string p0, "OP15Close"\n'
+                '\n'
+                '    const-string v0, "c1$a after z.a"\n'
+                '\n'
+                '    invoke-static {p0, v0}, Landroid/util/Log;->e(Ljava/lang/String;Ljava/lang/String;)I\n'
+                '\n'
+                '    move-result p0\n'
+                '\n'
+                '    .line 8\n'
+                '    .line 9\n'
+                '    .line 10\n'
+                '    return-void\n'
+                '.end method',
+                1,
+            )
+
+        if smali.match('*/x6/z.smali'):
+            fixed = fixed.replace(
+                '.method public final a(Ljava/lang/String;Ljava/lang/Runnable;)V\n'
+                '    .locals 1\n',
+                '.method public final a(Ljava/lang/String;Ljava/lang/Runnable;)V\n'
+                '    .locals 4\n',
+                1,
+            )
+            fixed = fixed.replace(
+                '    invoke-static {p1}, Ljava/util/Objects;->requireNonNull(Ljava/lang/Object;)Ljava/lang/Object;\n',
+                '    const-string v1, "OP15TaskBus"\n'
+                '\n'
+                '    new-instance v2, Ljava/lang/StringBuilder;\n'
+                '\n'
+                '    const-string v3, "schedule task="\n'
+                '\n'
+                '    invoke-direct {v2, v3}, Ljava/lang/StringBuilder;-><init>(Ljava/lang/String;)V\n'
+                '\n'
+                '    invoke-virtual {v2, p1}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;\n'
+                '\n'
+                '    invoke-virtual {v2}, Ljava/lang/StringBuilder;->toString()Ljava/lang/String;\n'
+                '\n'
+                '    move-result-object v2\n'
+                '\n'
+                '    invoke-static {v1, v2}, Landroid/util/Log;->e(Ljava/lang/String;Ljava/lang/String;)I\n'
+                '\n'
+                '    move-result v1\n'
+                '\n'
+                '    invoke-static {p1}, Ljava/util/Objects;->requireNonNull(Ljava/lang/Object;)Ljava/lang/Object;\n',
+                1,
+            )
+            fixed = fixed.replace(
+                '    iget-object p0, p0, Lx6/z;->a:Lx6/z$a;\n'
+                '\n'
+                '    .line 10\n'
+                '    .line 11\n'
+                '    invoke-virtual {p0, v0}, Ljava/util/concurrent/ThreadPoolExecutor;->execute(Ljava/lang/Runnable;)V\n',
+                '    iget-object p0, p0, Lx6/z;->a:Lx6/z$a;\n'
+                '\n'
+                '    .line 10\n'
+                '    .line 11\n'
+                '    invoke-virtual {p0, v0}, Ljava/util/concurrent/ThreadPoolExecutor;->execute(Ljava/lang/Runnable;)V\n'
+                '\n'
+                '    const-string p0, "OP15TaskBus"\n'
+                '\n'
+                '    const-string p1, "execute accepted"\n'
+                '\n'
+                '    invoke-static {p0, p1}, Landroid/util/Log;->e(Ljava/lang/String;Ljava/lang/String;)I\n'
+                '\n'
+                '    move-result p0\n',
+                1,
+            )
+
+        if smali.match('*/x6/z$d.smali'):
+            fixed = fixed.replace(
+                '.method public final run()V\n'
+                '    .locals 3\n',
+                '.method public final run()V\n'
+                '    .locals 5\n',
+                1,
+            )
+            fixed = fixed.replace(
+                '    iget-object v0, p0, Lx6/z$d;->b:Ljava/lang/String;\n',
+                '    iget-object v0, p0, Lx6/z$d;->b:Ljava/lang/String;\n'
+                '\n'
+                '    const-string v3, "OP15TaskBus"\n'
+                '\n'
+                '    new-instance v4, Ljava/lang/StringBuilder;\n'
+                '\n'
+                '    const-string v1, "run start task="\n'
+                '\n'
+                '    invoke-direct {v4, v1}, Ljava/lang/StringBuilder;-><init>(Ljava/lang/String;)V\n'
+                '\n'
+                '    invoke-virtual {v4, v0}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;\n'
+                '\n'
+                '    invoke-virtual {v4}, Ljava/lang/StringBuilder;->toString()Ljava/lang/String;\n'
+                '\n'
+                '    move-result-object v4\n'
+                '\n'
+                '    invoke-static {v3, v4}, Landroid/util/Log;->e(Ljava/lang/String;Ljava/lang/String;)I\n'
+                '\n'
+                '    move-result v3\n',
+                1,
+            )
+            fixed = fixed.replace(
+                '    invoke-interface {v1}, Ljava/lang/Runnable;->run()V\n',
+                '    invoke-interface {v1}, Ljava/lang/Runnable;->run()V\n'
+                '\n'
+                '    const-string v3, "OP15TaskBus"\n'
+                '\n'
+                '    new-instance v4, Ljava/lang/StringBuilder;\n'
+                '\n'
+                '    const-string v1, "run end task="\n'
+                '\n'
+                '    invoke-direct {v4, v1}, Ljava/lang/StringBuilder;-><init>(Ljava/lang/String;)V\n'
+                '\n'
+                '    invoke-virtual {v4, v0}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;\n'
+                '\n'
+                '    invoke-virtual {v4}, Ljava/lang/StringBuilder;->toString()Ljava/lang/String;\n'
+                '\n'
+                '    move-result-object v4\n'
+                '\n'
+                '    invoke-static {v3, v4}, Landroid/util/Log;->e(Ljava/lang/String;Ljava/lang/String;)I\n'
+                '\n'
+                '    move-result v3\n',
+                1,
+            )
+
+        if smali.match('*/vj/i.smali'):
+            fixed = fixed.replace(
+                '.method public final run()V\n'
+                '    .locals 10\n',
+                '.method public final run()V\n'
+                '    .locals 13\n'
+                '\n'
+                '    const-string v10, "OP15Preview"\n'
+                '\n'
+                '    const-string v11, "vj/i run entry"\n'
+                '\n'
+                '    invoke-static {v10, v11}, Landroid/util/Log;->e(Ljava/lang/String;Ljava/lang/String;)I\n'
+                '\n'
+                '    move-result v10\n',
+                1,
+            )
+            fixed = fixed.replace(
+                '    iget-object p0, v0, Lvj/k;->L:Landroid/os/ConditionVariable;\n'
+                '\n'
+                '    .line 370\n'
+                '    .line 371\n'
+                '    invoke-virtual {p0}, Landroid/os/ConditionVariable;->open()V\n',
+                '    iget-object p0, v0, Lvj/k;->L:Landroid/os/ConditionVariable;\n'
+                '\n'
+                '    const-string v10, "OP15Preview"\n'
+                '\n'
+                '    new-instance v11, Ljava/lang/StringBuilder;\n'
+                '\n'
+                '    const-string v12, "vj/i opening k="\n'
+                '\n'
+                '    invoke-direct {v11, v12}, Ljava/lang/StringBuilder;-><init>(Ljava/lang/String;)V\n'
+                '\n'
+                '    invoke-static {v0}, Ljava/lang/System;->identityHashCode(Ljava/lang/Object;)I\n'
+                '\n'
+                '    move-result v12\n'
+                '\n'
+                '    invoke-virtual {v11, v12}, Ljava/lang/StringBuilder;->append(I)Ljava/lang/StringBuilder;\n'
+                '\n'
+                '    const-string v12, " L="\n'
+                '\n'
+                '    invoke-virtual {v11, v12}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;\n'
+                '\n'
+                '    invoke-static {p0}, Ljava/lang/System;->identityHashCode(Ljava/lang/Object;)I\n'
+                '\n'
+                '    move-result v12\n'
+                '\n'
+                '    invoke-virtual {v11, v12}, Ljava/lang/StringBuilder;->append(I)Ljava/lang/StringBuilder;\n'
+                '\n'
+                '    invoke-virtual {v11}, Ljava/lang/StringBuilder;->toString()Ljava/lang/String;\n'
+                '\n'
+                '    move-result-object v11\n'
+                '\n'
+                '    invoke-static {v10, v11}, Landroid/util/Log;->e(Ljava/lang/String;Ljava/lang/String;)I\n'
+                '\n'
+                '    move-result v10\n'
+                '\n'
+                '    .line 370\n'
+                '    .line 371\n'
+                '    invoke-virtual {p0}, Landroid/os/ConditionVariable;->open()V\n'
+                '\n'
+                '    const-string p0, "OP15Preview"\n'
+                '\n'
+                '    const-string v10, "vj/i opened L condition"\n'
+                '\n'
+                '    invoke-static {p0, v10}, Landroid/util/Log;->e(Ljava/lang/String;Ljava/lang/String;)I\n'
+                '\n'
+                '    move-result p0\n',
+                1,
             )
 
         if smali.match('*/com/oplus/ocs/camera/producer/mode/BaseMode.smali'):
@@ -2723,6 +4509,193 @@ def blob_fixup_oplus_camera_framework_shims(ctx, file, file_path, *args, tmp_dir
             smali.write_text(fixed, encoding='utf-8')
 
 
+def blob_fixup_opluscamera_defer_job_count(ctx, file, file_path, *args, tmp_dir=None, **kwargs):
+    if tmp_dir is None:
+        return
+
+    smali = next(Path(tmp_dir).glob('smali*/ac/o0.smali'), None)
+    if smali is None:
+        return
+
+    data = smali.read_text(encoding='utf-8')
+    fixed = _replace_smali_method(
+        data,
+        'public final P()I',
+        '    .locals 1\n'
+        '\n'
+        '    const/4 v0, 0x0\n'
+        '\n'
+        '    return v0\n',
+    )
+    if fixed != data:
+        smali.write_text(fixed, encoding='utf-8')
+
+
+def blob_fixup_camera_unit_op15_camera_type(ctx, file, file_path, *args, tmp_dir=None, **kwargs):
+    if tmp_dir is None:
+        return
+
+    smali = next(
+        Path(tmp_dir).glob('smali*/com/oplus/ocs/camera/producer/info/CameraCharacteristicsWrapper.smali'),
+        None,
+    )
+    if smali is None:
+        return
+
+    data = smali.read_text(encoding='utf-8')
+    fixed = data.replace(
+        '    const-class v2, [I\n'
+        '\n'
+        '    invoke-direct {v0, v1, v2}, Landroid/hardware/camera2/CameraCharacteristics$Key;-><init>(Ljava/lang/String;Ljava/lang/Class;)V\n'
+        '\n'
+        '    sput-object v0, Lcom/oplus/ocs/camera/producer/info/CameraCharacteristicsWrapper;->KEY_CUSTOM_CAMERA_TYPE:Landroid/hardware/camera2/CameraCharacteristics$Key;\n',
+        '    const-class v2, [I\n'
+        '\n'
+        '    const-class v3, [B\n'
+        '\n'
+        '    invoke-direct {v0, v1, v3}, Landroid/hardware/camera2/CameraCharacteristics$Key;-><init>(Ljava/lang/String;Ljava/lang/Class;)V\n'
+        '\n'
+        '    sput-object v0, Lcom/oplus/ocs/camera/producer/info/CameraCharacteristicsWrapper;->KEY_CUSTOM_CAMERA_TYPE:Landroid/hardware/camera2/CameraCharacteristics$Key;\n',
+        1,
+    )
+    fixed = fixed.replace(
+        '    invoke-virtual {v1, p1}, Landroid/hardware/camera2/CameraCharacteristics;->get(Landroid/hardware/camera2/CameraCharacteristics$Key;)Ljava/lang/Object;\n'
+        '\n'
+        '    move-result-object v0\n'
+        '    :try_end_0\n',
+        '    invoke-virtual {v1, p1}, Landroid/hardware/camera2/CameraCharacteristics;->get(Landroid/hardware/camera2/CameraCharacteristics$Key;)Ljava/lang/Object;\n'
+        '\n'
+        '    move-result-object v0\n'
+        '\n'
+        '    sget-object v1, Lcom/oplus/ocs/camera/producer/info/CameraCharacteristicsWrapper;->KEY_CUSTOM_CAMERA_TYPE:Landroid/hardware/camera2/CameraCharacteristics$Key;\n'
+        '\n'
+        '    if-ne p1, v1, :cond_op15_camera_type_done\n'
+        '\n'
+        '    instance-of v1, v0, [B\n'
+        '\n'
+        '    if-eqz v1, :cond_op15_camera_type_done\n'
+        '\n'
+        '    check-cast v0, [B\n'
+        '\n'
+        '    array-length v1, v0\n'
+        '\n'
+        '    new-array v1, v1, [I\n'
+        '\n'
+        '    const/4 v2, 0x0\n'
+        '\n'
+        '    :goto_op15_camera_type_loop\n'
+        '    array-length v3, v0\n'
+        '\n'
+        '    if-ge v2, v3, :cond_op15_camera_type_converted\n'
+        '\n'
+        '    aget-byte v3, v0, v2\n'
+        '\n'
+        '    and-int/lit16 v3, v3, 0xff\n'
+        '\n'
+        '    aput v3, v1, v2\n'
+        '\n'
+        '    add-int/lit8 v2, v2, 0x1\n'
+        '\n'
+        '    goto :goto_op15_camera_type_loop\n'
+        '\n'
+        '    :cond_op15_camera_type_converted\n'
+        '    move-object v0, v1\n'
+        '\n'
+        '    :cond_op15_camera_type_done\n'
+        '    :try_end_0\n',
+        1,
+    )
+    fixed = fixed.replace(
+        '    move-result-object p0\n'
+        '\n'
+        '    check-cast p0, [I\n'
+        '\n'
+        '    if-eqz p0, :cond_0\n',
+        '    move-result-object p0\n'
+        '\n'
+        '    if-eqz p0, :cond_0\n',
+        1,
+    )
+    if fixed != data:
+        smali.write_text(fixed, encoding='utf-8')
+
+
+def blob_fixup_camera_unit_sdk_runtime(ctx, file, file_path, *args, tmp_dir=None, **kwargs):
+    if tmp_dir is None:
+        return
+
+    replacements = {
+        'com/google/oplus/protobuf/ExtensionRegistryLite.smali': (
+            ('.field private static volatile eagerlyParseMessageSets:Z = false',
+             '.field private static volatile eagerlyParseMessageSets:Z'),
+        ),
+        'com/oplus/camera/hdrtransform/HdrTransformPlatform.smali': (
+            ('.field private static sAlgoExists:Z = false',
+             '.field private static sAlgoExists:Z'),
+            ('.field private static sLibraryLoaded:Z = false',
+             '.field private static sLibraryLoaded:Z'),
+        ),
+        'com/oplus/ocs/camera/UxThreadPool.smali': (
+            ('.field private static sThreadUxMap:Landroid/util/SparseArray; = null',
+             '.field private static sThreadUxMap:Landroid/util/SparseArray;'),
+            ('.field private static sbHasSetUx:Z = false',
+             '.field private static sbHasSetUx:Z'),
+        ),
+        'com/oplus/ocs/camera/common/parameter/apsadapter/ApsHelper.smali': (
+            ('.field private static bInit:Z = false',
+             '.field private static bInit:Z'),
+        ),
+        'com/oplus/ocs/camera/common/util/OsenseKeyThreadHelper.smali': (
+            ('.field private static sOsenseInit:Z = false',
+             '.field private static sOsenseInit:Z'),
+        ),
+        'com/oplus/ocs/camera/consumer/ApsDataConvert.smali': (
+            ('.field private static sbUnderWaterVideoStatus:Z = false',
+             '.field private static sbUnderWaterVideoStatus:Z'),
+        ),
+        'com/oplus/ocs/camera/consumer/apsAdapter/ALog.smali': (
+            ('.field private static volatile sEnable:Z = false',
+             '.field private static volatile sEnable:Z'),
+            ('.field private static volatile sJNILoadFailed:Z = false',
+             '.field private static volatile sJNILoadFailed:Z'),
+            ('.field private static volatile sLogEncryptEnable:Z = false',
+             '.field private static volatile sLogEncryptEnable:Z'),
+        ),
+        'com/oplus/statistics/util/LogUtil.smali': (
+            ('.field private static isDebug:Z = false',
+             '.field private static isDebug:Z'),
+        ),
+    }
+
+    for relative, pairs in replacements.items():
+        smali = next(Path(tmp_dir).glob(f'smali*/{relative}'), None)
+        if smali is None:
+            continue
+        data = smali.read_text(encoding='utf-8')
+        fixed = data
+        for old, new in pairs:
+            fixed = fixed.replace(old, new, 1)
+        if fixed != data:
+            smali.write_text(fixed, encoding='utf-8')
+
+    smali = next(Path(tmp_dir).glob('smali*/com/oplus/ocs/camera/producer/mode/BaseMode.smali'), None)
+    if smali is None:
+        return
+
+    data = smali.read_text(encoding='utf-8')
+    fixed = _replace_smali_method(
+        data,
+        'public isSensorModeNeedWait(II)Z',
+        '    .locals 1\n'
+        '\n'
+        '    const/4 v0, 0x0\n'
+        '\n'
+        '    return v0\n',
+    )
+    if fixed != data:
+        smali.write_text(fixed, encoding='utf-8')
+
+
 lib_fixups: lib_fixups_user_type = {
     # **lib_fixups already includes the clang RT ubsan and proto 3.9.1
     # fixups that were previously handled by the bash helper functions
@@ -2739,23 +4712,33 @@ lib_fixups: lib_fixups_user_type = {
 }
 
 blob_fixups: blob_fixups_user_type = {
-    (
-        'system_ext/framework/com.oplus.camera.unit.sdk.jar',
-        'system_ext/framework/com.oplus.camera.unit.sdk.adapter.jar',
-    ): blob_fixup()
-        .apktool_unpack('patches/OplusCamera')
+    'odm/lib64/hw/camera.oemlayer.v2.so': blob_fixup()
+        .call(blob_fixup_camera_oemlayer_moonlayout_null_guard),
+    'system_ext/framework/com.oplus.camera.unit.sdk.jar': blob_fixup()
+        .call(blob_fixup_apktool_unpack_src)
+        .call(blob_fixup_camera_unit_op15_camera_type)
+        .call(blob_fixup_camera_unit_sdk_runtime)
+        .call(blob_fixup_oplus_camera_system_properties)
+        .call(blob_fixup_oplus_camera_framework_shims)
+        .apktool_pack()
+        .stripzip(),
+    'system_ext/framework/com.oplus.camera.unit.sdk.adapter.jar': blob_fixup()
+        .call(blob_fixup_apktool_unpack_src)
         .call(blob_fixup_oplus_camera_framework_shims)
         .apktool_pack()
         .stripzip(),
     'system_ext/priv-app/OplusCamera/OplusCamera.apk': blob_fixup()
         .call(blob_fixup_apktool_unpack_full)
         .call(blob_fixup_opluscamera_oppo_component_safe)
+        .call(blob_fixup_opluscamera_uses_library)
         .call(blob_fixup_oplus_camera_system_properties)
         .call(blob_fixup_oplus_camera_framework_shims)
+        .call(blob_fixup_opluscamera_defer_job_count)
         .apktool_pack()
         .stripzip(),
     'system_ext/app/AIUnit/AIUnit.apk': blob_fixup()
-        .call(blob_fixup_apktool_unpack_src)
+        .call(blob_fixup_apktool_unpack_full)
+        .call(blob_fixup_opluscamera_uses_library)
         .call(blob_fixup_aiunit_authorize_camera)
         .call(blob_fixup_aiunit_plugin_so_permissions)
         .call(blob_fixup_oplus_camera_framework_shims)
@@ -2763,8 +4746,19 @@ blob_fixups: blob_fixups_user_type = {
         .stripzip(),
     'system_ext/priv-app/OppoGallery2/OppoGallery2.apk': blob_fixup()
         .call(blob_fixup_apktool_unpack_full)
+        .call(blob_fixup_opluscamera_uses_library)
         .call(blob_fixup_oppogallery_op15_native_libs)
         .call(blob_fixup_oppogallery_receiver_flags)
+        .apktool_pack()
+        .stripzip(),
+    'system_ext/app/RomUpdate/RomUpdate.apk': blob_fixup()
+        .call(blob_fixup_apktool_unpack_full)
+        .call(blob_fixup_opluscamera_uses_library)
+        .apktool_pack()
+        .stripzip(),
+    'system_ext/app/SafeCenter/SafeCenter.apk': blob_fixup()
+        .call(blob_fixup_apktool_unpack_full)
+        .call(blob_fixup_opluscamera_uses_library)
         .apktool_pack()
         .stripzip(),
     'system_ext/app/SecurityPermission/SecurityPermission.apk': blob_fixup()

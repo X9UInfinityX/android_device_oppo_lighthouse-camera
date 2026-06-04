@@ -1,0 +1,2 @@
+allow installd data_system_camera_rus:dir { read open search };
+allow installd data_system_camera_rus:file { read open };

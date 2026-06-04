@@ -1,2 +1,6 @@
 
 camera/*
+__pycache__/
+tmp/
+gallery_decode_check/
+phonemanager_manifest_check/

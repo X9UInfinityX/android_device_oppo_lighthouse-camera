@@ -1,0 +1,3 @@
+on post-fs-data
+    mkdir /data/system/camera_rus 0777 cameraserver cameraserver
+    mkdir /data/vendor/camera_rus 0777 camera camera

@@ -1,0 +1,2 @@
+allow system_server data_system_camera_rus:dir { ioctl read write create getattr setattr lock relabelfrom rename open watch watch_reads add_name remove_name reparent search rmdir };
+allow system_server data_system_camera_rus:file { ioctl read write create getattr setattr lock append map unlink rename open watch watch_reads };

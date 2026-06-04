@@ -5,10 +5,12 @@ import android.hardware.camera2.CaptureRequest;
 import android.hardware.camera2.CaptureResult;
 import android.util.Log;
 import java.lang.reflect.Field;
-import java.lang.reflect.Method;
 
 public class CameraMetadataNativeWrapper {
     private static final String TAG = "CameraMetadataNativeWrapper";
+
+    public CameraMetadataNativeWrapper() {
+    }
 
     public static long getMetadataPtr(Object obj) {
         if (obj == null) {
@@ -16,17 +18,25 @@ public class CameraMetadataNativeWrapper {
         }
 
         try {
-            Object nativeMeta = obj;
-
+            final Object nativeMeta;
             if (obj instanceof CameraCharacteristics) {
-                nativeMeta = getCameraCharacteristicsNative((CameraCharacteristics) obj);
+                Field properties = CameraCharacteristics.class.getDeclaredField("mProperties");
+                properties.setAccessible(true);
+                nativeMeta = properties.get(obj);
             } else if (obj instanceof CaptureRequest) {
-                nativeMeta = getCaptureRequestNative((CaptureRequest) obj);
+                Field settings = CaptureRequest.class.getDeclaredField("mLogicalCameraSettings");
+                settings.setAccessible(true);
+                nativeMeta = settings.get(obj);
             } else if (obj instanceof CaptureResult) {
-                nativeMeta = getCaptureResultNative((CaptureResult) obj);
+                Field results = CaptureResult.class.getDeclaredField("mResults");
+                results.setAccessible(true);
+                nativeMeta = results.get(obj);
+            } else {
+                nativeMeta = obj;
             }
 
             if (nativeMeta == null) {
+                Log.e(TAG, "Unwrapped metadata is null");
                 return 0L;
             }
 
@@ -36,43 +46,6 @@ public class CameraMetadataNativeWrapper {
         } catch (Exception e) {
             Log.e(TAG, "Failed to get metadata ptr from " + obj.getClass().getName(), e);
             return 0L;
-        }
-    }
-
-    private static Object getCameraCharacteristicsNative(CameraCharacteristics characteristics)
-            throws Exception {
-        try {
-            Method getNativeCopy = CameraCharacteristics.class.getDeclaredMethod("getNativeCopy");
-            getNativeCopy.setAccessible(true);
-            return getNativeCopy.invoke(characteristics);
-        } catch (Exception e) {
-            Field properties = CameraCharacteristics.class.getDeclaredField("mProperties");
-            properties.setAccessible(true);
-            return properties.get(characteristics);
-        }
-    }
-
-    private static Object getCaptureRequestNative(CaptureRequest request) throws Exception {
-        try {
-            Method getNativeCopy = CaptureRequest.class.getDeclaredMethod("getNativeCopy");
-            getNativeCopy.setAccessible(true);
-            return getNativeCopy.invoke(request);
-        } catch (Exception e) {
-            Field settings = CaptureRequest.class.getDeclaredField("mLogicalCameraSettings");
-            settings.setAccessible(true);
-            return settings.get(request);
-        }
-    }
-
-    private static Object getCaptureResultNative(CaptureResult result) throws Exception {
-        try {
-            Method getNativeCopy = CaptureResult.class.getDeclaredMethod("getNativeCopy");
-            getNativeCopy.setAccessible(true);
-            return getNativeCopy.invoke(result);
-        } catch (Exception e) {
-            Field results = CaptureResult.class.getDeclaredField("mResults");
-            results.setAccessible(true);
-            return results.get(result);
         }
     }
 }

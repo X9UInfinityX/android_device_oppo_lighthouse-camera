@@ -53,6 +53,9 @@ my_product/lib64/libst_mobile.so:system_ext/lib64/libst_mobile.so;DISABLE_CHECKE
 my_product/lib64/libst_sticker_jni.so:system_ext/lib64/libst_sticker_jni.so;FIX_SONAME;DISABLE_CHECKELF
 
 odm/lib64/libOplusSecurity.so
+odm/lib64/libalogencrypt.so
+odm/lib/libalogencrypt.so
+odm/lib64/libarcsoft_hdr_couple_api.so:odm/lib64/libarcsoft_hdr_couple_api_V2.so;DISABLE_CHECKELF
 
 # OP15 camera/QNN runtime assets
 odm/etc/camera/pfb_bin/PreCalVarBinary.bin
@@ -87,22 +90,6 @@ vendor/lib64/qsn1rt43270_vga.bin
 vendor/lib64/qsn2all.bin
 vendor/lib64/qsn3_video.bin
 vendor/lib64/qsn3all.bin
-odm/lib/rfsa/adsp/libarc_htp_driver_skel.so:odm/lib/rfsa/adsp/cdsp/libarc_htp_driver_skel.so;MODULE_SUFFIX=_odm_adsp_cdsp;DISABLE_CHECKELF
-odm/lib/rfsa/adsp/libarc_htp_driver_skel.so:odm/lib/rfsa/adsp/hta_lib/libarc_htp_driver_skel.so;MODULE_SUFFIX=_odm_adsp_hta;DISABLE_CHECKELF
-odm/lib/rfsa/adsp/libarc_htp_driver_skel.so:odm/lib/rfsa/adsp/hta_lib/cdsp/libarc_htp_driver_skel.so;MODULE_SUFFIX=_odm_adsp_hta_cdsp;DISABLE_CHECKELF
-odm/lib/rfsa/adsp/libQnnHtpV81.so:odm/lib/rfsa/adsp/cdsp/libQnnHtpV81.so;MODULE_SUFFIX=_odm_adsp_cdsp;DISABLE_CHECKELF
-odm/lib/rfsa/adsp/libQnnHtpV81.so:odm/lib/rfsa/adsp/hta_lib/libQnnHtpV81.so;MODULE_SUFFIX=_odm_adsp_hta;DISABLE_CHECKELF
-odm/lib/rfsa/adsp/libQnnHtpV81.so:odm/lib/rfsa/adsp/hta_lib/cdsp/libQnnHtpV81.so;MODULE_SUFFIX=_odm_adsp_hta_cdsp;DISABLE_CHECKELF
-odm/lib/rfsa/adsp/libQnnHtpV81Skel.so:odm/lib/rfsa/adsp/cdsp/libQnnHtpV81Skel.so;MODULE_SUFFIX=_odm_adsp_cdsp;DISABLE_CHECKELF
-odm/lib/rfsa/adsp/libQnnHtpV81Skel.so:odm/lib/rfsa/adsp/hta_lib/libQnnHtpV81Skel.so;MODULE_SUFFIX=_odm_adsp_hta;DISABLE_CHECKELF
-odm/lib/rfsa/adsp/libQnnHtpV81Skel.so:odm/lib/rfsa/adsp/hta_lib/cdsp/libQnnHtpV81Skel.so;MODULE_SUFFIX=_odm_adsp_hta_cdsp;DISABLE_CHECKELF
-vendor/lib64/rfs/dsp/libbitml_nsp_81na_skel.so:odm/lib/rfsa/adsp/libbitml_nsp_81na_skel.so;MODULE_SUFFIX=_odm_adsp;DISABLE_CHECKELF
-vendor/lib64/rfs/dsp/libbitml_nsp_81na_skel.so:odm/lib/rfsa/adsp/cdsp/libbitml_nsp_81na_skel.so;MODULE_SUFFIX=_odm_adsp_cdsp;DISABLE_CHECKELF
-vendor/lib64/rfs/dsp/libbitml_nsp_81na_skel.so:odm/lib/rfsa/adsp/hta_lib/libbitml_nsp_81na_skel.so;MODULE_SUFFIX=_odm_adsp_hta;DISABLE_CHECKELF
-vendor/lib64/rfs/dsp/libbitml_nsp_81na_skel.so:odm/lib/rfsa/adsp/hta_lib/cdsp/libbitml_nsp_81na_skel.so;MODULE_SUFFIX=_odm_adsp_hta_cdsp;DISABLE_CHECKELF
-vendor/lib64/rfs/dsp/libbitml_nsp_81na_skel.so:odm/lib/rfsa/adsp/QNN_lib/libbitml_nsp_81na_skel.so;MODULE_SUFFIX=_qnn;DISABLE_CHECKELF
-vendor/lib64/rfs/dsp/libbitml_nsp_81na_skel.so:odm/lib/rfsa/adsp/QNN_lib/cdsp/libbitml_nsp_81na_skel.so;MODULE_SUFFIX=_qnn_cdsp;DISABLE_CHECKELF
-
 my_product/etc/camera/cdr_aging_set.json:system_ext/etc/camera/cdr_aging_set.json
 my_product/etc/camera/engineer_camera_config.json:system_ext/etc/camera/engineer_camera_config.json
 my_product/etc/camera/mt105CalibrationCfg.xml:system_ext/etc/camera/mt105CalibrationCfg.xml
@@ -145,6 +132,9 @@ my_product/lib64/liblivephoto.frc.jni.so:system_ext/lib64/liblivephoto.frc.jni.s
 
 system/lib64/vendor.oplus.hardware.cameraextension@1.0.so
 system/lib64/vendor.oplus.hardware.cameraextension-V1-ndk.so
+system/lib64/vendor.oplus.hardware.sendextcamcmd-V2-ndk.so;MODULE_SUFFIX=_system
+odm/lib64/hw/camera.oemlayer.v2.so
 system_ext/lib64/libbsproxy.so
+system_ext/lib64/libcsextimpl.so
 system_ext/lib64/liboplus-uah-client.so;MODULE_SUFFIX=_system_ext
 system_ext/lib64/vendor.oplus.hardware.cameraMDM@1.0.so
