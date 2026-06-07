@@ -112,6 +112,158 @@ def blob_fixup_apktool_unpack_full(ctx, file, file_path, *args, tmp_dir=None, **
     ])
 
 
+def blob_fixup_systemuiplugin_plugin_context_inflater(ctx, file, file_path, *args, tmp_dir=None, **kwargs):
+    if tmp_dir is None:
+        return
+
+    smali = Path(tmp_dir) / 'smali' / 'k9' / 'b.smali'
+    data = smali.read_text(encoding='utf-8')
+    old = """.method public W0(Landroid/content/Context;)Lt4/h;
+    .locals 1
+
+    const-string v0, "context"
+
+    invoke-static {p1, v0}, Lkotlin/jvm/internal/Intrinsics;->checkNotNullParameter(Ljava/lang/Object;Ljava/lang/String;)V
+
+    sget-object v0, Lt4/h;->m:Lt4/h;
+
+    if-nez v0, :cond_1
+
+    monitor-enter p0
+
+    :try_start_0
+    sget-object v0, Lt4/h;->m:Lt4/h;
+
+    if-nez v0, :cond_0
+
+    new-instance v0, Lt4/h;
+
+    invoke-direct {v0, p1}, Lt4/h;-><init>(Landroid/content/Context;)V
+
+    sput-object v0, Lt4/h;->m:Lt4/h;
+    :try_end_0
+    .catchall {:try_start_0 .. :try_end_0} :catchall_0
+
+    :cond_0
+    monitor-exit p0
+
+    goto :goto_0
+
+    :catchall_0
+    move-exception p1
+
+    monitor-exit p0
+
+    throw p1
+
+    :cond_1
+    :goto_0
+    return-object v0
+.end method"""
+    new = """.method public W0(Landroid/content/Context;)Lt4/h;
+    .locals 2
+
+    const-string v0, "context"
+
+    invoke-static {p1, v0}, Lkotlin/jvm/internal/Intrinsics;->checkNotNullParameter(Ljava/lang/Object;Ljava/lang/String;)V
+
+    sget-object v0, Lt4/h;->m:Lt4/h;
+
+    if-nez v0, :cond_2
+
+    monitor-enter p0
+
+    :try_start_0
+    sget-object v0, Lt4/h;->m:Lt4/h;
+
+    if-nez v0, :cond_1
+
+    sget-object v0, Lcom/oplus/systemui/plugins/seedling/plugin/ContextHandler;->Companion:Lcom/oplus/systemui/plugins/seedling/plugin/ContextHandler$Companion;
+
+    invoke-virtual {v0}, Lcom/oplus/systemui/plugins/seedling/plugin/ContextHandler$Companion;->getInstance()Lcom/oplus/systemui/plugins/seedling/plugin/ContextHandler;
+
+    move-result-object v0
+
+    invoke-virtual {v0}, Lcom/oplus/systemui/plugins/seedling/plugin/ContextHandler;->getPluginCtx()Landroid/content/Context;
+
+    move-result-object v1
+
+    if-eqz v1, :cond_0
+
+    move-object p1, v1
+
+    :cond_0
+    new-instance v0, Lt4/h;
+
+    invoke-direct {v0, p1}, Lt4/h;-><init>(Landroid/content/Context;)V
+
+    sput-object v0, Lt4/h;->m:Lt4/h;
+
+    :cond_1
+    monitor-exit p0
+
+    goto :goto_0
+
+    :catchall_0
+    move-exception p1
+
+    monitor-exit p0
+    :try_end_0
+    .catchall {:try_start_0 .. :try_end_0} :catchall_0
+
+    throw p1
+
+    :cond_2
+    :goto_0
+    sget-object v0, Lt4/h;->m:Lt4/h;
+
+    return-object v0
+.end method"""
+    if old in data:
+        data = data.replace(old, new, 1)
+    elif new not in data:
+        raise ValueError('SystemUIPlugin W0 context fix pattern not found')
+    smali.write_text(data, encoding='utf-8')
+
+    smali = Path(tmp_dir) / 'smali' / 't4' / 'h.smali'
+    data = smali.read_text(encoding='utf-8')
+    old = """    invoke-direct {v1, v0}, Lq4/d;-><init>(Landroid/content/Context;)V
+
+    iget-object v2, p0, Lt4/h;->a:Landroid/content/Context;
+"""
+    new = """    iget-object v2, p0, Lt4/h;->a:Landroid/content/Context;
+
+    invoke-direct {v1, v2}, Lq4/d;-><init>(Landroid/content/Context;)V
+"""
+    if old in data:
+        data = data.replace(old, new, 1)
+    elif new not in data:
+        raise ValueError('SystemUIPlugin card root context fix pattern not found')
+    old = """    const v3, 0x7f0c008c
+
+    invoke-static {v2, v3, v1}, Landroid/view/View;->inflate(Landroid/content/Context;ILandroid/view/ViewGroup;)Landroid/view/View;
+
+    const/4 v3, 0x0
+"""
+    new = """    const v3, 0x7f0c008c
+
+    invoke-static {v2}, Landroid/view/LayoutInflater;->from(Landroid/content/Context;)Landroid/view/LayoutInflater;
+
+    move-result-object v8
+
+    const/4 v4, 0x1
+
+    invoke-virtual {v8, v3, v1, v4}, Landroid/view/LayoutInflater;->inflate(ILandroid/view/ViewGroup;Z)Landroid/view/View;
+
+    const/4 v3, 0x0
+"""
+    if old in data:
+        data = data.replace(old, new, 1)
+    elif new not in data:
+        raise ValueError('SystemUIPlugin card layout inflater fix pattern not found')
+    smali.write_text(data, encoding='utf-8')
+
+
 def blob_fixup_camera_oemlayer_moonlayout_null_guard(ctx, file, file_path, *args, tmp_dir=None, **kwargs):
     data = Path(file_path).read_bytes()
     moonlayout_old = bytes.fromhex(
@@ -239,6 +391,301 @@ def blob_fixup_camera_oemlayer_moonlayout_null_guard(ctx, file, file_path, *args
     elif data.count(consumer_list_new) != 1:
         raise ValueError('camera.oemlayer.v2.so GetConsumerList null-guard pattern not found exactly once')
 
+    raw_notify_old = bytes.fromhex(
+        # ldur x8, [x29, #-152]
+        'a88356f8'
+        # ldr w8, [x8, #464]
+        '08d141b9'
+        # cbnz w8, +0x24
+        '28010035'
+        # b +0x4; fall through to Camera3Notify result compare
+        '01000014'
+        # sub x0, x29, #72
+        'a02301d1'
+        # bl Camera3Notify helper
+        'e88cfa97'
+        # ldr w8, [x0, #4]
+        '080440b9'
+    )
+    raw_notify_new = bytes.fromhex(
+        # ldur x8, [x29, #-152]
+        'a88356f8'
+        # ldr w8, [x8, #464]
+        '08d141b9'
+        # cbnz w8, +0x24
+        '28010035'
+        # b +0x34; skip optional shutter compare when the helper would return null
+        '0d000014'
+        # sub x0, x29, #72
+        'a02301d1'
+        # bl Camera3Notify helper
+        'e88cfa97'
+        # ldr w8, [x0, #4]
+        '080440b9'
+    )
+    if data.count(raw_notify_old) == 1:
+        data = data.replace(raw_notify_old, raw_notify_new, 1)
+    elif data.count(raw_notify_new) != 1:
+        raise ValueError('camera.oemlayer.v2.so RawNode shutter compare null-guard pattern not found exactly once')
+
+    notify_pick_frame_copy_old = bytes.fromhex(
+        # bl Camera3Notify helper
+        '67030094'
+        # add x1, x0, #16
+        '01400091'
+        # add x0, sp, #976
+        'e0430f91'
+        # bl deque<Pick_frame_info> copy constructor
+        '6b030094'
+        # b +0x4
+        '01000014'
+        # ldr x9, [sp, #816]
+        'e99b41f9'
+        # mov x8, xzr
+        'e8031faa'
+        # str x8, [x9, #8]
+        '280500f9'
+        # str x8, [sp, #960]
+        'e8e301f9'
+        # ldr x8, [sp, #888]
+        'e8bf41f9'
+    )
+    notify_pick_frame_copy_new = bytes.fromhex(
+        # bl Camera3Notify helper
+        '67030094'
+        # add x1, x0, #16
+        '01400091'
+        # cmp x1, #16
+        '3f4000f1'
+        # b.eq +0x37c; skip optional pick-frame copy when helper returned null
+        'e01b0054'
+        # add x0, sp, #976
+        'e0430f91'
+        # bl deque<Pick_frame_info> copy constructor
+        '69030094'
+        # ldr x9, [sp, #816]
+        'e99b41f9'
+        # str xzr, [x9, #8]
+        '3f0500f9'
+        # str xzr, [sp, #960]
+        'ffe301f9'
+        # ldr x8, [sp, #888]
+        'e8bf41f9'
+    )
+    if data.count(notify_pick_frame_copy_old) == 1:
+        data = data.replace(notify_pick_frame_copy_old, notify_pick_frame_copy_new, 1)
+    elif data.count(notify_pick_frame_copy_new) != 1:
+        raise ValueError('camera.oemlayer.v2.so Camera3Notify pick-frame copy null-guard pattern not found exactly once')
+
+    snapshot_flag_old = bytes.fromhex(
+        # bti c
+        '5f2403d5'
+        # sub sp, sp, #16
+        'ff4300d1'
+        # str x0, [sp, #8]
+        'e00700f9'
+        # str w1, [sp, #4]
+        'e10700b9'
+        # ldr x9, [sp, #8]
+        'e90740f9'
+        # ldr w8, [sp, #4]
+        'e80740b9'
+        # str w8, [x9, #184]
+        '28b900b9'
+    )
+    snapshot_flag_new = bytes.fromhex(
+        # bti c
+        '5f2403d5'
+        # cbz x0, +0x8
+        '400000b4'
+        # str w1, [x0, #184]
+        '01b800b9'
+        # ret
+        'c0035fd6'
+        # nop; preserve original instruction span
+        '1f2003d5'
+        # nop
+        '1f2003d5'
+        # nop
+        '1f2003d5'
+    )
+    if data.count(snapshot_flag_old) == 1:
+        data = data.replace(snapshot_flag_old, snapshot_flag_new, 1)
+    elif data.count(snapshot_flag_new) != 1:
+        raise ValueError('camera.oemlayer.v2.so OCaptureObject snapshot flag null-guard pattern not found exactly once')
+
+    offline_capture_queue_old = bytes.fromhex(
+        # ldr x0, [x0, #24]
+        '000c40f9'
+        # bl deque<OCaptureObject>::back()
+        '15cafd97'
+        # mov x1, x0
+        'e10300aa'
+        # ldr x0, [sp, #208]
+        'e06b40f9'
+        # str x1, [sp, #200]
+        'e16700f9'
+        # bl shared_ptr<DataCollectProc>::get()
+        '1af2ff97'
+        # ldr x1, [sp, #200]
+        'e16740f9'
+        # add x0, x0, #280
+        '00600491'
+        # bl copy shared_ptr<OCaptureObject>
+        '2acafd97'
+    )
+    offline_capture_queue_new = bytes.fromhex(
+        # ldr x0, [x0, #24]
+        '000c40f9'
+        # ldr x8, [x0, #32]
+        '081040f9'
+        # cbz x8, +0x1c; skip deque::back() when OCapObj queue is empty
+        'e80000b4'
+        # bl deque<OCaptureObject>::back()
+        '13cafd97'
+        # mov x28, x0
+        'fc0300aa'
+        # ldr x0, [sp, #384]; shared_ptr<DataCollectProc>::get() equivalent
+        'e0c340f9'
+        # mov x1, x28
+        'e1031caa'
+        # add x0, x0, #280
+        '00600491'
+        # bl copy shared_ptr<OCaptureObject>
+        '2acafd97'
+    )
+    if data.count(offline_capture_queue_old) == 1:
+        data = data.replace(offline_capture_queue_old, offline_capture_queue_new, 1)
+    elif data.count(offline_capture_queue_new) != 1:
+        raise ValueError('camera.oemlayer.v2.so OfflineNode capture queue empty-guard pattern not found exactly once')
+
+    sink_capture_queue_old = bytes.fromhex(
+        # ldr x0, [x0, #24]
+        '000c40f9'
+        # bl deque<OCaptureObject>::back()
+        '060afe97'
+        # mov x1, x0
+        'e10300aa'
+        # ldur x0, [x29, #-168]
+        'a08355f8'
+        # stur x1, [x29, #-176]
+        'a10315f8'
+        # bl shared_ptr<DataCollectProc>::get()
+        '03010094'
+        # ldur x1, [x29, #-176]
+        'a10355f8'
+        # add x0, x0, #272
+        '00400491'
+        # bl copy shared_ptr<OCaptureObject>
+        '1b0afe97'
+    )
+    sink_capture_queue_new = bytes.fromhex(
+        # ldr x0, [x0, #24]
+        '000c40f9'
+        # ldr x8, [x0, #32]
+        '081040f9'
+        # cbz x8, +0x1c; skip deque::back() when OCapObj queue is empty
+        'e80000b4'
+        # bl deque<OCaptureObject>::back()
+        '040afe97'
+        # mov x1, x0
+        'e10300aa'
+        # ldur x0, [x29, #-32]; load raw DataCollectProc pointer from local shared_ptr
+        'a0035ef8'
+        # add x0, x0, #272
+        '00400491'
+        # bl copy shared_ptr<OCaptureObject>
+        '1c0afe97'
+        # nop; preserve original instruction span
+        '1f2003d5'
+    )
+    if data.count(sink_capture_queue_old) == 1:
+        data = data.replace(sink_capture_queue_old, sink_capture_queue_new, 1)
+    elif data.count(sink_capture_queue_new) != 1:
+        raise ValueError('camera.oemlayer.v2.so CSinkNode capture queue empty-guard pattern not found exactly once')
+
+    raw_pick_frame_old = bytes.fromhex(
+        # ldr w8, [x8, #768]
+        '080143b9'
+        # subs w8, w8, #1
+        '08050071'
+        # mov w8, w8
+        'e803082a'
+        # mov w1, w8
+        'e103082a'
+        # bl deque<Pick_frame_info>::operator[]()
+        '4888fa97'
+        # ldr x8, [sp, #656]
+        'e84b41f9'
+        # ldr q0, [x0]
+        '0000c03d'
+        # str q0, [x8]
+        '0001803d'
+    )
+    raw_pick_frame_new = bytes.fromhex(
+        # cmp x0, #16
+        '1f4000f1'
+        # b.eq +0x138; skip result metadata when the helper returned null
+        'c0090054'
+        # ldr w8, [x8, #768]
+        '080143b9'
+        # sub w1, w8, #1
+        '01050051'
+        # bl deque<Pick_frame_info>::operator[]()
+        '4888fa97'
+        # ldr x8, [sp, #656]
+        'e84b41f9'
+        # ldr q0, [x0]
+        '0000c03d'
+        # str q0, [x8]
+        '0001803d'
+    )
+    if data.count(raw_pick_frame_old) == 1:
+        data = data.replace(raw_pick_frame_old, raw_pick_frame_new, 1)
+    elif data.count(raw_pick_frame_new) != 1:
+        raise ValueError('camera.oemlayer.v2.so RawNode pick-frame empty-guard pattern not found exactly once')
+
+    picked_rdi_empty_old = bytes.fromhex(
+        # bl Camera3Notify helper
+        '705dfa97'
+        # add x0, x0, #16
+        '00400091'
+        # bl deque<Pick_frame_info>::empty()
+        '0096fd97'
+        # tbnz w0, #0, +0x190
+        '800c0037'
+        # b +0x4
+        '01000014'
+        # mov w8, wzr
+        'e8031f2a'
+        # str w8, [sp, #136]
+        'e88b00b9'
+        # b +0x4
+        '01000014'
+    )
+    picked_rdi_empty_new = bytes.fromhex(
+        # bl Camera3Notify helper
+        '705dfa97'
+        # add x0, x0, #16
+        '00400091'
+        # cmp x0, #16
+        '1f4000f1'
+        # b.eq +0x190; skip picked RDI path when helper returned null
+        '800c0054'
+        # bl deque<Pick_frame_info>::empty()
+        'fe95fd97'
+        # tbnz w0, #0, +0x188
+        '400c0037'
+        # mov w8, wzr
+        'e8031f2a'
+        # str w8, [sp, #136]
+        'e88b00b9'
+    )
+    if data.count(picked_rdi_empty_old) == 1:
+        data = data.replace(picked_rdi_empty_old, picked_rdi_empty_new, 1)
+    elif data.count(picked_rdi_empty_new) != 1:
+        raise ValueError('camera.oemlayer.v2.so GetPickedRDIFrame empty-guard pattern not found exactly once')
+
     Path(file_path).write_bytes(data)
 
 
@@ -276,6 +723,110 @@ def blob_fixup_opluscamera_uses_library(ctx, file, file_path, *args, tmp_dir=Non
     elif '</application>' in data:
         data = data.replace('</application>', entry + '    </application>', 1)
         manifest.write_text(data, encoding='utf-8')
+
+
+def blob_fixup_fileencryption_secure_settings_permission(ctx, file, file_path, *args, tmp_dir=None, **kwargs):
+    if tmp_dir is None:
+        return
+
+    manifest = Path(tmp_dir) / 'AndroidManifest.xml'
+    data = manifest.read_text(encoding='utf-8') if manifest.exists() else ''
+    permission = '    <uses-permission android:name="android.permission.WRITE_SECURE_SETTINGS"/>\n'
+    if data and 'android.permission.WRITE_SECURE_SETTINGS' not in data:
+        data = data.replace('<application ', permission + '    <application ', 1)
+        manifest.write_text(data, encoding='utf-8')
+
+
+def blob_fixup_phonemanager_secure_settings_permission(ctx, file, file_path, *args, tmp_dir=None, **kwargs):
+    if tmp_dir is None:
+        return
+
+    manifest = Path(tmp_dir) / 'AndroidManifest.xml'
+    data = manifest.read_text(encoding='utf-8') if manifest.exists() else ''
+    permission = '    <uses-permission android:name="android.permission.WRITE_SECURE_SETTINGS"/>\n'
+    if data and 'android.permission.WRITE_SECURE_SETTINGS' not in data:
+        data = data.replace('<application ', permission + '    <application ', 1)
+        manifest.write_text(data, encoding='utf-8')
+
+
+def blob_fixup_ums_activity_watcher_permission(ctx, file, file_path, *args, tmp_dir=None, **kwargs):
+    if tmp_dir is None:
+        return
+
+    manifest = Path(tmp_dir) / 'AndroidManifest.xml'
+    data = manifest.read_text(encoding='utf-8') if manifest.exists() else ''
+    permission = '    <uses-permission android:name="android.permission.SET_ACTIVITY_WATCHER"/>\n'
+    if data and 'android.permission.SET_ACTIVITY_WATCHER' not in data:
+        data = data.replace('<application ', permission + '    <application ', 1)
+        manifest.write_text(data, encoding='utf-8')
+
+
+def blob_fixup_phonemanager_settings_category(ctx, file, file_path, *args, tmp_dir=None, **kwargs):
+    if tmp_dir is None:
+        return
+
+    manifest = Path(tmp_dir) / 'AndroidManifest.xml'
+    data = manifest.read_text(encoding='utf-8') if manifest.exists() else ''
+    if not data:
+        return
+
+    old = 'android:value="com.oplus.settings.category.ia.phone_manager"'
+    new = 'android:value="com.android.settings.category.ia.more_security_privacy_settings"'
+    fixed = data.replace(old, new, 1)
+    if fixed != data:
+        manifest.write_text(fixed, encoding='utf-8')
+    elif new not in data:
+        raise ValueError('PhoneManager Settings category metadata not found')
+
+
+def blob_fixup_cryptoeng_permissions_xml(ctx, file, file_path, *args, tmp_dir=None, **kwargs):
+    path = Path(file_path)
+    data = path.read_text(encoding='utf-8')
+    fixed = data.replace('\n</permissions>\n\n<permissions>\n', '\n')
+    if fixed != data:
+        path.write_text(fixed, encoding='utf-8')
+
+
+def blob_fixup_safecenter_receiver_flags(ctx, file, file_path, *args, tmp_dir=None, **kwargs):
+    if tmp_dir is None:
+        return
+
+    smali = Path(tmp_dir) / 'smali_classes2/com/oplus/safecenter/privacy/view/BaseSelfFinishActivity.smali'
+    data = smali.read_text(encoding='utf-8') if smali.exists() else ''
+    fixed = data.replace(
+        '.method protected onCreate(Landroid/os/Bundle;)V\n'
+        '    .locals 3\n',
+        '.method protected onCreate(Landroid/os/Bundle;)V\n'
+        '    .locals 10\n',
+        1,
+    )
+    old = (
+        '    const/4 v2, 0x0\n'
+        '\n'
+        '    invoke-virtual {p0, v0, p1, v1, v2}, Landroid/content/Context;->registerReceiver(Landroid/content/BroadcastReceiver;Landroid/content/IntentFilter;Ljava/lang/String;Landroid/os/Handler;)Landroid/content/Intent;\n'
+    )
+    new = (
+        '    const/4 v2, 0x0\n'
+        '\n'
+        '    move-object v4, p0\n'
+        '\n'
+        '    move-object v5, v0\n'
+        '\n'
+        '    move-object v6, p1\n'
+        '\n'
+        '    move-object v7, v1\n'
+        '\n'
+        '    move-object v8, v2\n'
+        '\n'
+        '    const/4 v9, 0x4\n'
+        '\n'
+        '    invoke-virtual/range {v4 .. v9}, Landroid/content/Context;->registerReceiver(Landroid/content/BroadcastReceiver;Landroid/content/IntentFilter;Ljava/lang/String;Landroid/os/Handler;I)Landroid/content/Intent;\n'
+    )
+    fixed = fixed.replace(old, new, 1)
+    if fixed != data:
+        smali.write_text(fixed, encoding='utf-8')
+    elif 'registerReceiver(Landroid/content/BroadcastReceiver;Landroid/content/IntentFilter;Ljava/lang/String;Landroid/os/Handler;I)' not in data:
+        raise ValueError('SafeCenter receiver flag patch point not found')
 
 
 def blob_fixup_securitypermission_safe_permissions(ctx, file, file_path, *args, tmp_dir=None, **kwargs):
@@ -347,6 +898,536 @@ def blob_fixup_oppogallery_receiver_flags(ctx, file, file_path, *args, tmp_dir=N
         '    invoke-virtual/range {v1 .. v6}, Landroid/content/Context;->registerReceiver(Landroid/content/BroadcastReceiver;Landroid/content/IntentFilter;Ljava/lang/String;Landroid/os/Handler;I)Landroid/content/Intent;\n'
     )
     fixed = data.replace(old, new)
+    if fixed != data:
+        smali.write_text(fixed, encoding='utf-8')
+
+
+def blob_fixup_oppogallery_safe_box_custom_flag(ctx, file, file_path, *args, tmp_dir=None, **kwargs):
+    if tmp_dir is None:
+        return
+
+    smali = next(
+        (
+            path
+            for path in Path(tmp_dir).glob('smali*/com/oplus/aiunit/vision/mn4.smali')
+            if '.method public static final f(Ljava/lang/String;ZZ)Z' in path.read_text(encoding='utf-8')
+        ),
+        None,
+    )
+    if smali is None:
+        raise ValueError('OppoGallery2 config wrapper class not found')
+    data = smali.read_text(encoding='utf-8')
+    pattern = re.compile(
+        r'(\.method public static final f\(Ljava/lang/String;ZZ\)Z\n'
+        r'    \.locals 3\n'
+        r'.*?'
+        r'    invoke-static \{p0, v0\}, Lkotlin/jvm/internal/Intrinsics;->checkNotNullParameter\(Ljava/lang/Object;Ljava/lang/String;\)V\n'
+        r'\n)'
+        r'(    \.line 4\n'
+        r'    \.line 5\n'
+        r'    \.line 6\n'
+        r'    sget-object v0, Lcom/oplus/aiunit/vision/fr4;->a:Landroid/content/Context;\n)',
+        re.DOTALL,
+    )
+    insert = (
+        r'\1'
+        '    const-string v0, "feature_is_support_user_custom_safe_box"\n'
+        '\n'
+        '    invoke-static {p0, v0}, Lkotlin/jvm/internal/Intrinsics;->areEqual(Ljava/lang/Object;Ljava/lang/Object;)Z\n'
+        '\n'
+        '    move-result v0\n'
+        '\n'
+        '    if-eqz v0, :oplus_safe_box_config_default_f\n'
+        '\n'
+        '    const/4 p0, 0x1\n'
+        '\n'
+        '    return p0\n'
+        '\n'
+        '    :oplus_safe_box_config_default_f\n'
+        '\n'
+        '    const-string v0, "configId"\n'
+        '\n'
+        r'\2'
+    )
+    fixed, count = pattern.subn(insert, data, count=1)
+    if fixed != data:
+        smali.write_text(fixed, encoding='utf-8')
+    elif ':oplus_safe_box_config_default_f' not in data:
+        raise ValueError('OppoGallery2 SafeBox config patch point not found')
+
+
+def blob_fixup_oppogallery_google_photos_consent_on_verify_failure(ctx, file, file_path, *args, tmp_dir=None, **kwargs):
+    if tmp_dir is None:
+        return
+
+    smali = Path(tmp_dir) / 'smali_classes8/com/oplus/aiunit/vision/bi8$a.smali'
+    data = smali.read_text(encoding='utf-8') if smali.exists() else ''
+    old = (
+        '    if-eqz p1, :cond_0\n'
+        '\n'
+        '    .line 14\n'
+        '    .line 15\n'
+        '    sget-object v3, Lcom/oplus/aiunit/vision/we1;->a:Lcom/oplus/aiunit/vision/we1;\n'
+    )
+    new = (
+        '    nop\n'
+        '\n'
+        '    .line 14\n'
+        '    .line 15\n'
+        '    sget-object v3, Lcom/oplus/aiunit/vision/we1;->a:Lcom/oplus/aiunit/vision/we1;\n'
+    )
+    fixed = data.replace(old, new, 1)
+    if fixed != data:
+        smali.write_text(fixed, encoding='utf-8')
+    elif '    nop\n\n    .line 14\n    .line 15\n    sget-object v3, Lcom/oplus/aiunit/vision/we1;->a:Lcom/oplus/aiunit/vision/we1;\n' not in data:
+        raise ValueError('OppoGallery2 Google Photos consent failure continuation patch point not found')
+
+
+def blob_fixup_oppogallery_google_photos_launch_consent_after_verify_failure(ctx, file, file_path, *args, tmp_dir=None, **kwargs):
+    if tmp_dir is None:
+        return
+
+    smali = Path(tmp_dir) / 'smali_classes8/com/oplus/gallery/framework/abilities/gcloudsync/GCloudSyncStatusManager$c.smali'
+    if not smali.exists():
+        raise ValueError('OppoGallery2 GCloudSyncStatusManager verify coroutine not found')
+
+    data = smali.read_text(encoding='utf-8')
+    marker = re.compile(
+        r'(    invoke-static \{v0, v1, p0\}, Lcom/oplus/aiunit/vision/ro8;->q\(Ljava/lang/String;Ljava/lang/String;Ljava/lang/Throwable;\)V\n'
+        r'(?:\n|    \.line \d+\n)*)'
+        r'(    :cond_[0-9a-f]+\n)'
+    )
+    insert = (
+        r'\1'
+        '    sget-object v2, Lcom/oplus/aiunit/vision/we1;->a:Lcom/oplus/aiunit/vision/we1;\n'
+        '\n'
+        '    invoke-static {}, Lkotlinx/coroutines/Dispatchers;->getIO()Lkotlinx/coroutines/CoroutineDispatcher;\n'
+        '\n'
+        '    move-result-object v3\n'
+        '\n'
+        '    const/4 v4, 0x0\n'
+        '\n'
+        '    new-instance v5, Lcom/oplus/aiunit/vision/ej8;\n'
+        '\n'
+        '    sget-object v1, Lcom/oplus/gallery/business_lib/cloudsync/EntryPoint;->SETTINGS:Lcom/oplus/gallery/business_lib/cloudsync/EntryPoint;\n'
+        '\n'
+        '    invoke-direct {v5, v1, v4}, Lcom/oplus/aiunit/vision/ej8;-><init>(Lcom/oplus/gallery/business_lib/cloudsync/EntryPoint;Lkotlin/coroutines/Continuation;)V\n'
+        '\n'
+        '    const/4 v6, 0x2\n'
+        '\n'
+        '    const/4 v7, 0x0\n'
+        '\n'
+        '    invoke-static/range {v2 .. v7}, Lkotlinx/coroutines/BuildersKt;->launch$default(Lkotlinx/coroutines/CoroutineScope;Lkotlin/coroutines/CoroutineContext;Lkotlinx/coroutines/CoroutineStart;Lkotlin/jvm/functions/Function2;ILjava/lang/Object;)Lkotlinx/coroutines/Job;\n'
+        '\n'
+        r'\2'
+    )
+    fixed, count = marker.subn(insert, data, count=1)
+    if fixed != data:
+        smali.write_text(fixed, encoding='utf-8')
+    elif 'Lcom/oplus/gallery/business_lib/cloudsync/EntryPoint;->SETTINGS:Lcom/oplus/gallery/business_lib/cloudsync/EntryPoint;' not in data:
+        raise ValueError('OppoGallery2 Google Photos verify failure consent launch patch point not found')
+
+
+def blob_fixup_oppogallery_hide_google_photos_backup_settings(ctx, file, file_path, *args, tmp_dir=None, **kwargs):
+    if tmp_dir is None:
+        return
+
+    smali = Path(tmp_dir) / 'smali_classes10/com/oplus/gallery/settingpage/SettingsActivity$SettingFragment.smali'
+    if not smali.exists():
+        raise ValueError('OppoGallery2 settings fragment not found')
+
+    data = smali.read_text(encoding='utf-8')
+    old = (
+        '    :cond_1\n'
+        '    :goto_0\n'
+        '    iget-object v0, v1, Lcom/oplus/gallery/settingpage/SettingsActivity$SettingFragment;->i:Landroidx/preference/PreferenceScreen;\n'
+        '\n'
+        '    .line 62\n'
+        '    .line 63\n'
+        '    const-string v3, "pref_category_key_sending"\n'
+    )
+    new = (
+        '    :cond_1\n'
+        '    :goto_0\n'
+        '    iget-object v0, v1, Lcom/oplus/gallery/settingpage/SettingsActivity$SettingFragment;->i:Landroidx/preference/PreferenceScreen;\n'
+        '\n'
+        '    if-eqz v0, :oplus_hide_google_photos_backup_settings_done\n'
+        '\n'
+        '    const-string v3, "pref_category_key_cloud_sync"\n'
+        '\n'
+        '    invoke-virtual {v0, v3}, Landroidx/preference/PreferenceGroup;->removePreferenceRecursively(Ljava/lang/CharSequence;)Z\n'
+        '\n'
+        '    const-string v3, "pref_category_cloud_sync_key"\n'
+        '\n'
+        '    invoke-virtual {v0, v3}, Landroidx/preference/PreferenceGroup;->removePreferenceRecursively(Ljava/lang/CharSequence;)Z\n'
+        '\n'
+        '    const-string v3, "pref_key_auto_sync_2"\n'
+        '\n'
+        '    invoke-virtual {v0, v3}, Landroidx/preference/PreferenceGroup;->removePreferenceRecursively(Ljava/lang/CharSequence;)Z\n'
+        '\n'
+        '    const-string v3, "pref_category_key_cloud_storage_space"\n'
+        '\n'
+        '    invoke-virtual {v0, v3}, Landroidx/preference/PreferenceGroup;->removePreferenceRecursively(Ljava/lang/CharSequence;)Z\n'
+        '\n'
+        '    :oplus_hide_google_photos_backup_settings_done\n'
+        '    iget-object v0, v1, Lcom/oplus/gallery/settingpage/SettingsActivity$SettingFragment;->i:Landroidx/preference/PreferenceScreen;\n'
+        '\n'
+        '    .line 62\n'
+        '    .line 63\n'
+        '    const-string v3, "pref_category_key_sending"\n'
+    )
+    fixed = data.replace(old, new, 1)
+    if fixed != data:
+        smali.write_text(fixed, encoding='utf-8')
+    elif ':oplus_hide_google_photos_backup_settings_done' not in data:
+        raise ValueError('OppoGallery2 Google Photos backup settings hide patch point not found')
+
+
+def blob_fixup_aiunit_stdid_duid_fallback(ctx, file, file_path, *args, tmp_dir=None, **kwargs):
+    if tmp_dir is None:
+        return
+
+    smali = next(
+        (
+            path
+            for path in Path(tmp_dir).glob('smali*/e8/c.smali')
+            if 'StdIDSDK;->getDUID' in path.read_text(encoding='utf-8')
+        ),
+        None,
+    )
+    if smali is None:
+        raise ValueError('AIUnit StdID DUID class not found')
+    data = smali.read_text(encoding='utf-8')
+    pattern = re.compile(
+        r'(    invoke-static \{v3\}, Lcom/oplus/stdid/sdk/StdIDSDK;->getDUID\(Landroid/content/Context;\)Ljava/lang/String;\n'
+        r'(?:\n|    \.line \d+\n)*'
+        r'    move-result-object v3\n'
+        r'(?:\n|    \.line \d+\n)*)'
+        r'(    iget-object v6, p0, Le8/c;->c:Landroid/content/Context;\n)'
+    )
+    insert = (
+        '    invoke-static {v3}, Lcom/oplus/stdid/sdk/StdIDSDK;->getDUID(Landroid/content/Context;)Ljava/lang/String;\n'
+        '\n'
+        '    move-result-object v3\n'
+        '\n'
+        '    invoke-static {v3}, Landroid/text/TextUtils;->isEmpty(Ljava/lang/CharSequence;)Z\n'
+        '\n'
+        '    move-result v6\n'
+        '\n'
+        '    if-eqz v6, :oplus_aiunit_duid_ok\n'
+        '\n'
+        '    invoke-static {}, Lw8/e;->b()Lw8/b;\n'
+        '\n'
+        '    move-result-object v6\n'
+        '\n'
+        '    const-string v8, "duid"\n'
+        '\n'
+        '    const-string v9, ""\n'
+        '\n'
+        '    invoke-interface {v6, v8, v9}, Lw8/b;->getString(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;\n'
+        '\n'
+        '    move-result-object v3\n'
+        '\n'
+        '    invoke-static {v3}, Landroid/text/TextUtils;->isEmpty(Ljava/lang/CharSequence;)Z\n'
+        '\n'
+        '    move-result v6\n'
+        '\n'
+        '    if-eqz v6, :oplus_aiunit_duid_ok\n'
+        '\n'
+        '    invoke-static {}, Ljava/util/UUID;->randomUUID()Ljava/util/UUID;\n'
+        '\n'
+        '    move-result-object v3\n'
+        '\n'
+        '    invoke-virtual {v3}, Ljava/util/UUID;->toString()Ljava/lang/String;\n'
+        '\n'
+        '    move-result-object v3\n'
+        '\n'
+        '    const-string v6, "-"\n'
+        '\n'
+        '    const-string v8, ""\n'
+        '\n'
+        '    invoke-virtual {v3, v6, v8}, Ljava/lang/String;->replace(Ljava/lang/CharSequence;Ljava/lang/CharSequence;)Ljava/lang/String;\n'
+        '\n'
+        '    move-result-object v3\n'
+        '\n'
+        '    invoke-virtual {v3}, Ljava/lang/String;->toUpperCase()Ljava/lang/String;\n'
+        '\n'
+        '    move-result-object v3\n'
+        '\n'
+        '    :oplus_aiunit_duid_ok\n'
+    )
+    fixed, count = pattern.subn(insert + r'\2', data, count=1)
+    if count == 1:
+        smali.write_text(fixed, encoding='utf-8')
+    elif ':oplus_aiunit_duid_ok' not in data:
+        raise ValueError('AIUnit StdID DUID fallback patch point not found')
+
+
+def blob_fixup_aiunit_stdid_header_fallback(ctx, file, file_path, *args, tmp_dir=None, **kwargs):
+    if tmp_dir is None:
+        return
+
+    smali = next(
+        (
+            path
+            for path in Path(tmp_dir).glob('smali*/d9/h.smali')
+            if '.method public static b()Ljava/lang/String;' in path.read_text(encoding='utf-8')
+        ),
+        None,
+    )
+    if smali is None:
+        raise ValueError('AIUnit StdID header class not found')
+    data = smali.read_text(encoding='utf-8')
+    old_b = '''.method public static b()Ljava/lang/String;
+    .locals 1
+
+    .line 1
+    invoke-static {}, Le8/d;->a()Le8/a;
+
+    .line 2
+    .line 3
+    .line 4
+    move-result-object v0
+
+    .line 5
+    invoke-interface {v0}, Le8/a;->b()Lz7/b;
+
+    .line 6
+    .line 7
+    .line 8
+    move-result-object v0
+
+    .line 9
+    if-nez v0, :cond_0
+
+    .line 10
+    .line 11
+    goto :goto_0
+
+    .line 12
+    :cond_0
+    invoke-static {}, Le8/d;->a()Le8/a;
+
+    .line 13
+    .line 14
+    .line 15
+    move-result-object v0
+
+    .line 16
+    invoke-interface {v0}, Le8/a;->b()Lz7/b;
+
+    .line 17
+    .line 18
+    .line 19
+    move-result-object v0
+
+    .line 20
+    if-eqz v0, :cond_1
+
+    .line 21
+    .line 22
+    iget-object v0, v0, Lz7/b;->a:Ljava/lang/String;
+
+    .line 23
+    .line 24
+    if-eqz v0, :cond_1
+
+    .line 25
+    .line 26
+    goto :goto_1
+
+    .line 27
+    :cond_1
+    :goto_0
+    const-string v0, ""
+
+    .line 28
+    .line 29
+    :goto_1
+    return-object v0
+.end method
+'''
+    new_b = '''.method public static b()Ljava/lang/String;
+    .locals 1
+
+    invoke-static {}, Le8/d;->a()Le8/a;
+
+    move-result-object v0
+
+    invoke-interface {v0}, Le8/a;->c()Lz7/b;
+
+    move-result-object v0
+
+    if-eqz v0, :cond_0
+
+    iget-object v0, v0, Lz7/b;->a:Ljava/lang/String;
+
+    if-eqz v0, :cond_0
+
+    goto :goto_0
+
+    :cond_0
+    const-string v0, ""
+
+    :goto_0
+    return-object v0
+.end method
+'''
+    old_c = '''.method public static c()Ljava/lang/String;
+    .locals 1
+
+    .line 1
+    invoke-static {}, Le8/d;->a()Le8/a;
+
+    .line 2
+    .line 3
+    .line 4
+    move-result-object v0
+
+    .line 5
+    invoke-interface {v0}, Le8/a;->b()Lz7/b;
+
+    .line 6
+    .line 7
+    .line 8
+    move-result-object v0
+
+    .line 9
+    if-nez v0, :cond_0
+
+    .line 10
+    .line 11
+    goto :goto_0
+
+    .line 12
+    :cond_0
+    invoke-static {}, Le8/d;->a()Le8/a;
+
+    .line 13
+    .line 14
+    .line 15
+    move-result-object v0
+
+    .line 16
+    invoke-interface {v0}, Le8/a;->b()Lz7/b;
+
+    .line 17
+    .line 18
+    .line 19
+    move-result-object v0
+
+    .line 20
+    if-eqz v0, :cond_1
+
+    .line 21
+    .line 22
+    iget-object v0, v0, Lz7/b;->b:Ljava/lang/String;
+
+    .line 23
+    .line 24
+    if-eqz v0, :cond_1
+
+    .line 25
+    .line 26
+    goto :goto_1
+
+    .line 27
+    :cond_1
+    :goto_0
+    const-string v0, ""
+
+    .line 28
+    .line 29
+    :goto_1
+    return-object v0
+.end method
+'''
+    new_c = '''.method public static c()Ljava/lang/String;
+    .locals 1
+
+    invoke-static {}, Le8/d;->a()Le8/a;
+
+    move-result-object v0
+
+    invoke-interface {v0}, Le8/a;->c()Lz7/b;
+
+    move-result-object v0
+
+    if-eqz v0, :cond_0
+
+    iget-object v0, v0, Lz7/b;->b:Ljava/lang/String;
+
+    if-eqz v0, :cond_0
+
+    goto :goto_0
+
+    :cond_0
+    const-string v0, ""
+
+    :goto_0
+    return-object v0
+.end method
+'''
+    fixed = data.replace(old_b, new_b).replace(old_c, new_c)
+    if fixed != data:
+        smali.write_text(fixed, encoding='utf-8')
+    elif 'invoke-interface {v0}, Le8/a;->c()Lz7/b;' not in data:
+        raise ValueError('AIUnit StdID header fallback patch point not found')
+
+
+def blob_fixup_stdid_receiver_flags(ctx, file, file_path, *args, tmp_dir=None, **kwargs):
+    if tmp_dir is None:
+        return
+
+    smali = Path(tmp_dir) / 'smali/com/oplus/stdid/AppApplication.smali'
+    data = smali.read_text(encoding='utf-8') if smali.exists() else ''
+    old = (
+        '.method public final onCreate()V\n'
+        '    .locals 5\n'
+    )
+    new = (
+        '.method public final onCreate()V\n'
+        '    .locals 10\n'
+    )
+    fixed = data.replace(old, new, 1)
+    old = (
+        '    invoke-virtual {p0, v4, v0}, Landroid/content/Context;->registerReceiver(Landroid/content/BroadcastReceiver;Landroid/content/IntentFilter;)Landroid/content/Intent;\n'
+    )
+    new = (
+        '    move-object v5, v4\n'
+        '\n'
+        '    move-object v4, p0\n'
+        '\n'
+        '    move-object v6, v0\n'
+        '\n'
+        '    move-object v7, v1\n'
+        '\n'
+        '    move-object v8, v1\n'
+        '\n'
+        '    const/4 v9, 0x4\n'
+        '\n'
+        '    invoke-virtual/range {v4 .. v9}, Landroid/content/Context;->registerReceiver(Landroid/content/BroadcastReceiver;Landroid/content/IntentFilter;Ljava/lang/String;Landroid/os/Handler;I)Landroid/content/Intent;\n'
+    )
+    fixed = fixed.replace(old, new, 1)
+    old = (
+        '    invoke-virtual {p0, v4, v0, v2, v1}, Landroid/content/Context;->registerReceiver(Landroid/content/BroadcastReceiver;Landroid/content/IntentFilter;Ljava/lang/String;Landroid/os/Handler;)Landroid/content/Intent;\n'
+    )
+    new = (
+        '    move-object v5, v4\n'
+        '\n'
+        '    move-object v4, p0\n'
+        '\n'
+        '    move-object v6, v0\n'
+        '\n'
+        '    move-object v7, v2\n'
+        '\n'
+        '    move-object v8, v1\n'
+        '\n'
+        '    const/4 v9, 0x4\n'
+        '\n'
+        '    invoke-virtual/range {v4 .. v9}, Landroid/content/Context;->registerReceiver(Landroid/content/BroadcastReceiver;Landroid/content/IntentFilter;Ljava/lang/String;Landroid/os/Handler;I)Landroid/content/Intent;\n'
+    )
+    fixed = fixed.replace(old, new, 1)
     if fixed != data:
         smali.write_text(fixed, encoding='utf-8')
 
@@ -1379,16 +2460,42 @@ def blob_fixup_aiunit_plugin_so_permissions(ctx, file, file_path, *args, tmp_dir
         smali.write_text(fixed, encoding='utf-8')
 
 
+def blob_fixup_aiunit_settings_search_xml(ctx, file, file_path, *args, tmp_dir=None, **kwargs):
+    if tmp_dir is None:
+        return
+
+    patched = False
+    for xml in Path(tmp_dir).glob('res/xml/*.xml'):
+        data = xml.read_text(encoding='utf-8')
+        fixed = data.replace(
+            '<androidx.preference.PreferenceScreen',
+            '<PreferenceScreen',
+        ).replace(
+            '</androidx.preference.PreferenceScreen>',
+            '</PreferenceScreen>',
+        )
+        if fixed != data:
+            xml.write_text(fixed, encoding='utf-8')
+            patched = True
+
+    if not patched:
+        raise ValueError('AIUnit Settings search PreferenceScreen XML patch point not found')
+
+
 def blob_fixup_oplus_camera_system_properties(ctx, file, file_path, *args, tmp_dir=None, **kwargs):
     if tmp_dir is None:
         return
 
     for smali in Path(tmp_dir).glob('smali*/**/*.smali'):
         data = smali.read_text(encoding='utf-8')
-        fixed = data.replace(
-            'Lcom/oplus/wrapper/os/SystemProperties;',
-            'Landroid/os/SystemProperties;',
-        )
+        fixed = data
+        for old, new in {
+            'Lcom/oplus/wrapper/os/SystemProperties;': 'Landroid/os/SystemProperties;',
+            'Lcom/oplus/wrapper/os/UserHandle;': 'Landroid/os/UserHandle;',
+            'Lcom/oplus/wrapper/os/Trace;': 'Landroid/os/Trace;',
+            'Lcom/oplus/wrapper/os/Debug;': 'Landroid/os/Debug;',
+        }.items():
+            fixed = fixed.replace(old, new)
         if fixed != data:
             smali.write_text(fixed, encoding='utf-8')
 
@@ -1407,6 +2514,34 @@ def blob_fixup_oplus_camera_framework_shims(ctx, file, file_path, *args, tmp_dir
             'com.oplus.preview.outflash.connected': 'com.oplus.flashtrigger.state',
             'com.oplus.facebeauty.custom': 'com.oplus.facebeauty.level',
             'com.oplus.aec.customAE.enable': 'com.oplus.macro.closeup.enable',
+            'com.oplus.DolIsStaggerState': 'com.oplus.capture.request.idx',
+            'com.oplus.iris.aperture.switching': 'com.oplus.capture.request.idx',
+            'com.oplus.isRawMax': 'com.oplus.capture.request.idx',
+            'com.oplus.is.master.mode': 'com.oplus.capture.request.idx',
+            'com.oplus.control.face.dr': 'com.oplus.capture.request.idx',
+            'com.oplus.fallback.stable': 'com.oplus.capture.request.idx',
+            'com.oplus.capture.job.type': 'com.oplus.capture.request.idx',
+            'com.oplus.capture.request.need.preview.stream': 'com.oplus.capture.request.idx',
+            'com.oplus.filter.mode': 'com.oplus.capture.request.idx',
+            'com.oplus.app.filter.type': 'com.oplus.capture.request.idx',
+            'com.oplus.aicolor.rear.enable': 'com.oplus.capture.request.idx',
+            'com.oplus.camera.3d.api.state': 'com.oplus.capture.request.idx',
+            'com.oplus.camera.configure.thermal.level': 'com.oplus.capture.request.idx',
+            'com.oplus.camera.pi.enable': 'com.oplus.capture.request.idx',
+            'com.oplus.camera.pi.enable_list': 'com.oplus.capture.request.idx',
+            'com.oplus.asd.hdr.scope': 'com.oplus.capture.request.idx',
+            'com.oplus.night.se.enable': 'com.oplus.capture.request.idx',
+            'com.oplus.preview.ai.preset.asd.enable': 'com.oplus.capture.request.idx',
+            'com.oplus.lsd.enable': 'com.oplus.capture.request.idx',
+            'com.oplus.only.zoom.change': 'com.oplus.capture.request.idx',
+            'com.oplus.config.aeExposureCompensation': 'com.oplus.capture.request.idx',
+            'com.oplus.naturetone.state': 'com.oplus.capture.request.idx',
+            'com.oplus.hal.fluency': 'com.oplus.capture.request.idx',
+            'com.oplus.double.ois.wirecutoff.detection.sn': 'com.oplus.capture.request.idx',
+            'com.oplus.process.pid': 'com.oplus.capture.request.idx',
+            'com.oplus.TR.processing.state': 'com.oplus.capture.request.idx',
+            'com.oplus.capture.request.idx_list': 'com.oplus.capture.request.idx',
+            'com.oplus.picture.offset.time': 'com.oplus.capture.request.idx',
             'com.oplus.izoom.ability.support': 'com.oplus.aps.zoom.feature',
             'com.oplus.mipiraw.online.bpc': 'com.oplus.capture.mipiraw.online.bpc',
             'com.oplus.full.bining.qbc.enable': 'com.oplus.camera.is.from.main.menu',
@@ -3660,7 +4795,7 @@ def blob_fixup_oplus_camera_framework_shims(ctx, file, file_path, *args, tmp_dir
                 1,
             )
 
-        if smali.match('*/com/oplus/ocs/camera/CameraStateCallbackAdapterV2.smali'):
+        if False and smali.match('*/com/oplus/ocs/camera/CameraStateCallbackAdapterV2.smali'):
             fixed = _replace_smali_method(
                 fixed,
                 'public onCameraOpened(Lcom/oplus/ocs/camera/appinterface/CameraDeviceInterface;)V',
@@ -4692,6 +5827,42 @@ def blob_fixup_camera_unit_sdk_runtime(ctx, file, file_path, *args, tmp_dir=None
         '\n'
         '    return v0\n',
     )
+    sat_identity_old = (
+        '    invoke-static {}, Lcom/oplus/ocs/camera/common/util/Util;->isSystemCamera()Z\n'
+        '\n'
+        '    move-result p2\n'
+        '\n'
+        '    if-nez p2, :cond_24\n'
+        '\n'
+        '    invoke-virtual {p0, p3}, Lcom/oplus/ocs/camera/producer/mode/BaseMode;->useOplusCameraCase(Ljava/lang/String;)Z\n'
+        '\n'
+        '    move-result p2\n'
+        '\n'
+        '    if-eqz p2, :cond_24\n'
+        '\n'
+        '    .line 630\n'
+        '    sget-object p2, Lcom/oplus/ocs/camera/metadata/UConfigureKeys;->IS_OPLUS_PACKAGE:Lcom/oplus/ocs/camera/metadata/RequestKey;\n'
+    )
+    sat_identity_new = (
+        '    invoke-static {}, Lcom/oplus/ocs/camera/common/util/Util;->isSystemCamera()Z\n'
+        '\n'
+        '    move-result p2\n'
+        '\n'
+        '    nop\n'
+        '\n'
+        '    invoke-virtual {p0, p3}, Lcom/oplus/ocs/camera/producer/mode/BaseMode;->useOplusCameraCase(Ljava/lang/String;)Z\n'
+        '\n'
+        '    move-result p2\n'
+        '\n'
+        '    if-eqz p2, :cond_24\n'
+        '\n'
+        '    .line 630\n'
+        '    sget-object p2, Lcom/oplus/ocs/camera/metadata/UConfigureKeys;->IS_OPLUS_PACKAGE:Lcom/oplus/ocs/camera/metadata/RequestKey;\n'
+    )
+    if fixed.count(sat_identity_old) == 1:
+        fixed = fixed.replace(sat_identity_old, sat_identity_new, 1)
+    elif fixed.count(sat_identity_new) != 1:
+        raise ValueError('com.oplus.camera.unit.sdk.jar BaseMode SAT identity guard pattern not found exactly once')
     if fixed != data:
         smali.write_text(fixed, encoding='utf-8')
 
@@ -4741,7 +5912,16 @@ blob_fixups: blob_fixups_user_type = {
         .call(blob_fixup_opluscamera_uses_library)
         .call(blob_fixup_aiunit_authorize_camera)
         .call(blob_fixup_aiunit_plugin_so_permissions)
+        .call(blob_fixup_aiunit_settings_search_xml)
+        .call(blob_fixup_aiunit_stdid_duid_fallback)
+        .call(blob_fixup_aiunit_stdid_header_fallback)
         .call(blob_fixup_oplus_camera_framework_shims)
+        .apktool_pack()
+        .stripzip(),
+    'system_ext/app/SystemUIPlugin/SystemUIPlugin.apk': blob_fixup()
+        .call(blob_fixup_apktool_unpack_full)
+        .call(blob_fixup_oplus_camera_system_properties)
+        .call(blob_fixup_systemuiplugin_plugin_context_inflater)
         .apktool_pack()
         .stripzip(),
     'system_ext/priv-app/OppoGallery2/OppoGallery2.apk': blob_fixup()
@@ -4749,6 +5929,15 @@ blob_fixups: blob_fixups_user_type = {
         .call(blob_fixup_opluscamera_uses_library)
         .call(blob_fixup_oppogallery_op15_native_libs)
         .call(blob_fixup_oppogallery_receiver_flags)
+        .call(blob_fixup_oppogallery_safe_box_custom_flag)
+        .call(blob_fixup_oppogallery_google_photos_consent_on_verify_failure)
+        .call(blob_fixup_oppogallery_google_photos_launch_consent_after_verify_failure)
+        .call(blob_fixup_oppogallery_hide_google_photos_backup_settings)
+        .apktool_pack()
+        .stripzip(),
+    'system_ext/priv-app/StdID/StdID.apk': blob_fixup()
+        .call(blob_fixup_apktool_unpack_full)
+        .call(blob_fixup_stdid_receiver_flags)
         .apktool_pack()
         .stripzip(),
     'system_ext/app/RomUpdate/RomUpdate.apk': blob_fixup()
@@ -4756,9 +5945,47 @@ blob_fixups: blob_fixups_user_type = {
         .call(blob_fixup_opluscamera_uses_library)
         .apktool_pack()
         .stripzip(),
+    'system_ext/priv-app/PhoneManager/PhoneManager.apk': blob_fixup()
+        .call(blob_fixup_apktool_unpack_full)
+        .call(blob_fixup_opluscamera_uses_library)
+        .call(blob_fixup_phonemanager_secure_settings_permission)
+        .call(blob_fixup_phonemanager_settings_category)
+        .apktool_pack()
+        .stripzip(),
     'system_ext/app/SafeCenter/SafeCenter.apk': blob_fixup()
         .call(blob_fixup_apktool_unpack_full)
         .call(blob_fixup_opluscamera_uses_library)
+        .call(blob_fixup_safecenter_receiver_flags)
+        .apktool_pack()
+        .stripzip(),
+    'system_ext/etc/permissions/vendor-oplus-hardware-cryptoeng.xml': blob_fixup()
+        .call(blob_fixup_cryptoeng_permissions_xml),
+    'system_ext/app/FileManager/FileManager.apk': blob_fixup()
+        .call(blob_fixup_apktool_unpack_full)
+        .call(blob_fixup_opluscamera_uses_library)
+        .apktool_pack()
+        .stripzip(),
+    'system_ext/priv-app/UMS/UMS.apk': blob_fixup()
+        .call(blob_fixup_apktool_unpack_full)
+        .call(blob_fixup_opluscamera_uses_library)
+        .call(blob_fixup_ums_activity_watcher_permission)
+        .apktool_pack()
+        .stripzip(),
+    'system_ext/priv-app/OplusExSystemService/OplusExSystemService.apk': blob_fixup()
+        .call(blob_fixup_apktool_unpack_full)
+        .call(blob_fixup_opluscamera_uses_library)
+        .apktool_pack()
+        .stripzip(),
+    'system_ext/priv-app/DCS/DCS.apk': blob_fixup()
+        .call(blob_fixup_apktool_unpack_full)
+        .call(blob_fixup_opluscamera_uses_library)
+        .apktool_pack()
+        .stripzip(),
+    'system_ext/priv-app/FileEncryption/FileEncryption.apk': blob_fixup()
+        .call(blob_fixup_apktool_unpack_full)
+        .call(blob_fixup_opluscamera_uses_library)
+        .call(blob_fixup_fileencryption_secure_settings_permission)
+        .call(blob_fixup_oplus_camera_system_properties)
         .apktool_pack()
         .stripzip(),
     'system_ext/app/SecurityPermission/SecurityPermission.apk': blob_fixup()

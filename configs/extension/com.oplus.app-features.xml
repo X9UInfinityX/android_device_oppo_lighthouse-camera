@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<extend_features>
+    <app_feature name="com.oplus.ambient.livealert.setting_switch" args="boolean:true"/>
+</extend_features>

@@ -1,2 +1,4 @@
 # Camera
 oplusoiface    u:object_r:oplusoiface_service:s0
+oplus_accesscontrol    u:object_r:oplus_accesscontrol_service:s0
+security_permission                         u:object_r:security_permission_service:s0

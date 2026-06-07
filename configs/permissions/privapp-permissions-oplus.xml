@@ -79,6 +79,33 @@
         <permission name="com.oppo.permission.safe.SECURITY"/>
     </privapp-permissions>
 
+    <!-- OPLUS standard ID service -->
+    <privapp-permissions package="com.oplus.stdid">
+        <permission name="android.permission.INTERACT_ACROSS_USERS"/>
+    </privapp-permissions>
+
+    <!-- OPLUS statistics -->
+    <privapp-permissions package="com.nearme.statistics.rom">
+        <permission name="android.permission.READ_PRIVILEGED_PHONE_STATE"/>
+    </privapp-permissions>
+
+    <privapp-permissions package="com.oplus.statistics.rom">
+        <permission name="android.permission.READ_PRIVILEGED_PHONE_STATE"/>
+        <permission name="android.permission.BATTERY_STATS"/>
+        <permission name="android.permission.PACKAGE_USAGE_STATS"/>
+        <permission name="android.permission.SCHEDULE_EXACT_ALARM"/>
+    </privapp-permissions>
+
+    <!-- OPLUS phone manager -->
+    <privapp-permissions package="com.oplus.phonemanager">
+        <permission name="android.permission.WRITE_SECURE_SETTINGS"/>
+    </privapp-permissions>
+
+    <!-- OPLUS private safe -->
+    <privapp-permissions package="com.oplus.encryption">
+        <permission name="android.permission.WRITE_SECURE_SETTINGS"/>
+    </privapp-permissions>
+
     <!-- OPLUS exsystemservice -->
     <privapp-permissions package="com.oplus.exsystemservice">
         <permission name="android.permission.INTERACT_ACROSS_USERS" />
@@ -89,5 +116,10 @@
         <permission name="android.permission.MODIFY_PHONE_STATE"/>
         <permission name="android.permission.MANAGE_USERS"/>
         <permission name="android.permission.INSTALL_PACKAGES"/>
+    </privapp-permissions>
+
+    <!-- OPLUS Live Alert -->
+    <privapp-permissions package="com.oplus.ambient.livealert">
+        <permission name="android.permission.INTERACT_ACROSS_USERS"/>
     </privapp-permissions>
 </permissions>

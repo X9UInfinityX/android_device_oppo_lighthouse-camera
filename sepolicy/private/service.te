@@ -1,2 +1,4 @@
 # Camera
 type oplusoiface_service, system_api_service, service_manager_type;
+type oplus_accesscontrol_service, app_api_service, system_server_service, service_manager_type;
+type security_permission_service, app_api_service, system_server_service, service_manager_type;

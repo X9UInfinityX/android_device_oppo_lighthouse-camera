@@ -1,6 +1,11 @@
 # Blob dependencies
 PRODUCT_PACKAGES += \
-    android.hardware.graphics.common-V3-ndk.vendor
+    android.hardware.graphics.common-V3-ndk.vendor \
+    oplus-services \
+    Photos
+
+PRODUCT_SYSTEM_SERVER_JARS += \
+    oplus-services
 
 # Framework
 # PRODUCT_BOOT_JARS += \
@@ -13,7 +18,9 @@ PRODUCT_PACKAGES += \
 # Permissions
 PRODUCT_COPY_FILES += \
     $(LOCAL_PATH)/configs/init/init.oplus.camera_rus.rc:$(TARGET_COPY_OUT_SYSTEM_EXT)/etc/init/init.oplus.camera_rus.rc \
+    $(LOCAL_PATH)/configs/extension/com.oplus.app-features.xml:$(TARGET_COPY_OUT_SYSTEM_EXT)/etc/extension/com.oplus.app-features.xml \
     $(LOCAL_PATH)/configs/permissions/com.oplus.android-features.xml:$(TARGET_COPY_OUT_SYSTEM_EXT)/etc/permissions/com.oplus.android-features.xml \
+    $(LOCAL_PATH)/configs/permissions/com.oplus.pantanal.ums.privapp_permissions.xml:$(TARGET_COPY_OUT_SYSTEM_EXT)/etc/permissions/com.oplus.pantanal.ums.privapp_permissions.xml \
     $(LOCAL_PATH)/configs/permissions/oplus_google_lens_config.xml:$(TARGET_COPY_OUT_SYSTEM_EXT)/etc/permissions/oplus_google_lens_config.xml \
     $(LOCAL_PATH)/configs/permissions/privapp-permissions-oplus.xml:$(TARGET_COPY_OUT_SYSTEM_EXT)/etc/permissions/privapp-permissions-oplus.xml \
     $(LOCAL_PATH)/configs/framework/androidx.camera.extensions.impl.jar:$(TARGET_COPY_OUT_SYSTEM_EXT)/framework/androidx.camera.extensions.impl.jar \
@@ -79,7 +86,8 @@ PRODUCT_PRODUCT_PROPERTIES += \
 PRODUCT_VENDOR_PROPERTIES += \
     ro.camera.enableCamera1MaxZsl=1 \
     ro.vendor.oplus.camera.backCamSize=50MP+50MP+50MP \
-    ro.vendor.oplus.camera.frontCamSize=32MP
+    ro.vendor.oplus.camera.frontCamSize=32MP \
+    ro.vendor.oplus.regionmark=ROW
 
 PRODUCT_SYSTEM_EXT_PROPERTIES += \
     ro.build.version.oplus.api=37 \

@@ -23,4 +23,8 @@ public final class SystemProperties {
     public static long getLong(String key, long def) {
         return android.os.SystemProperties.getLong(key, def);
     }
+
+    public static void set(String key, String val) {
+        android.os.SystemProperties.set(key, val);
+    }
 }

@@ -36,7 +36,7 @@ public class OplusActivityManager {
         return new ArrayList();
     }
 
-    public Bundle getConfigInfo(String configName, int flag, int userId) {
+    public Bundle getConfigInfo(String configName, int flag, int userId) throws RemoteException {
         return null;
     }
 
@@ -91,7 +91,7 @@ public class OplusActivityManager {
         return false;
     }
 
-    public boolean putConfigInfo(String configName, Bundle bundle, int flag, int userId) {
+    public boolean putConfigInfo(String configName, Bundle bundle, int flag, int userId) throws RemoteException {
         return true;
     }
 
@@ -109,6 +109,9 @@ public class OplusActivityManager {
     }
 
     public void setPreventIndulgeController(com.oplus.app.IOplusAppStartController controller) {
+    }
+
+    public void setAppStartMonitorController(com.oplus.app.IOplusAppStartController controller) {
     }
 
     public void startActivity(Intent intent) {
