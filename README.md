@@ -1,4 +1,4 @@
-# proprietary_vendor_oplus_camera
+# vendor_oplus_camera
 
 Prebuilt stock oplus Camera to include in custom ROM builds.
 
@@ -23,13 +23,6 @@ then run:
 ```
 cd vendor/oneplus/camera
 ./extract-files.py /path/to/OP15/dump
-```
-
-For the local OP15 dump used during this port:
-
-```
-cd ~/android/INFIX/vendor/oneplus/camera
-./extract-files.py ~/Desktop/MIO-KITCHEN/OP15
 ```
 
 The extractor reads `proprietary-files.txt`, pulls the listed files from the
