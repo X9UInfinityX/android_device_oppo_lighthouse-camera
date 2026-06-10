@@ -1,9 +1,3 @@
-dex_import {
-    name: "oplus-services",
-    owner: "oneplus/camera",
-    jars: ["camera/proprietary/system/framework/oplus-services.jar"],
-}
-
 cc_prebuilt_library_shared {
     name: "libQnnHtp_gallery_system_ext",
     stem: "libQnnHtp",
