@@ -26,11 +26,6 @@ PRODUCT_COPY_FILES += \
     $(LOCAL_PATH)/configs/framework/androidx.camera.extensions.impl.jar:$(TARGET_COPY_OUT_SYSTEM_EXT)/framework/androidx.camera.extensions.impl.jar \
     $(LOCAL_PATH)/configs/sysconfig/hiddenapi-package-oplus-whitelist.xml:$(TARGET_COPY_OUT_SYSTEM)/etc/sysconfig/hiddenapi-package-oplus-whitelist.xml
 
-# OPlus camera framework wrapper stubs. Keep these off the bootclasspath and
-# load them only for OplusCamera via the app's uses-library declaration.
-PRODUCT_PACKAGES += \
-    oplus-camera-stubs
-
 # Gallery's ODNN retouch path dlopens QNN libraries by basename. Install the
 # OP15 QNN runtime in system_ext and place real copies in Gallery's native lib dir.
 PRODUCT_PACKAGES += \
