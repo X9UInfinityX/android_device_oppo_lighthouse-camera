@@ -6013,3 +6013,53 @@ module = ExtractUtilsModule(
 if __name__ == '__main__':
     utils = ExtractUtils.device(module)
     utils.run()
+    
+from pathlib import Path
+import os
+import re
+
+
+CUSTOM_SOONG_BEGIN = "// BEGIN INFINITI-CAMERA CUSTOM SOONG MODULES"
+CUSTOM_SOONG_END = "// END INFINITI-CAMERA CUSTOM SOONG MODULES"
+
+
+def write_custom_android_bp():
+    top = Path(os.environ.get(
+        "ANDROID_BUILD_TOP",
+        Path(__file__).resolve().parents[3],
+    ))
+
+    android_bp = top / "vendor" / "oneplus" / "infiniti-camera" / "Android.bp"
+    android_bp.parent.mkdir(parents=True, exist_ok=True)
+
+    old_text = android_bp.read_text() if android_bp.exists() else ""
+
+    old_text = re.sub(
+        rf"\n?{re.escape(CUSTOM_SOONG_BEGIN)}.*?{re.escape(CUSTOM_SOONG_END)}\n?",
+        "\n",
+        old_text,
+        flags=re.S,
+    ).strip()
+
+    custom_block = f"""
+{CUSTOM_SOONG_BEGIN}
+
+dex_import {{
+    name: "oplus-services",
+    owner: "oneplus/camera",
+    jars: ["proprietary/system/framework/oplus-services.jar"],
+    visibility: ["//visibility:public"],
+}}
+
+{CUSTOM_SOONG_END}
+""".strip()
+
+    new_text = old_text
+    if new_text:
+        new_text += "\n\n"
+    new_text += custom_block
+    new_text += "\n"
+
+    android_bp.write_text(new_text)
+    
+write_custom_android_bp()
