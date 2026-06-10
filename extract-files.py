@@ -5993,7 +5993,6 @@ blob_fixups: blob_fixups_user_type = {
         .call(blob_fixup_securitypermission_safe_permissions)
         .apktool_pack()
         .stripzip(),
-    'system_ext/priv-app/OplusAppPlatform/OplusAppPlatform.apk': blob_fixup(),
 }  # fmt: skip
 
 namespace_imports = [
