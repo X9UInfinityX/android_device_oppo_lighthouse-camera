@@ -5997,16 +5997,15 @@ blob_fixups: blob_fixups_user_type = {
 }  # fmt: skip
 
 namespace_imports = [
-    'vendor/oneplus/camera/camera',
     'vendor/oneplus/infiniti',
     'vendor/oneplus/sm8850-common',
     'hardware/oplus',
 ]
 
 module = ExtractUtilsModule(
-    'camera',
-    'oneplus/camera',
-    device_rel_path='vendor/oneplus/camera',
+    'infiniti-camera',
+    'oneplus',
+    device_rel_path='device/oneplus/infiniti-camera',
     blob_fixups=blob_fixups,
     lib_fixups=lib_fixups,
     namespace_imports=namespace_imports,
