@@ -1,8 +1,0 @@
-java_library {
-    name: "oplus-camera-stubs",
-    srcs: ["src/**/*.java"],
-    libs: ["oplus-fwk"],
-    platform_apis: true,
-    installable: true,
-    system_ext_specific: true,
-}
