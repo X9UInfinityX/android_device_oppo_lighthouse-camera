@@ -17,7 +17,7 @@
      <!-- OPlus camera framework wrapper stubs. Kept off bootclasspath and
           loaded by OplusCamera through its uses-library declaration. -->
      <library name="oplus.camera.stubs"
-        file="/system_ext/framework/oplus-camera-stubs.jar"/>
+        file="/system_ext/framework/oplus-fwk.jar"/>
 
      <!-- OPLUS appplatform -->
      <privapp-permissions package="com.oplus.appplatform">
