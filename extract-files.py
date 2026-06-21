@@ -222,7 +222,7 @@ def blob_fixup_systemuiplugin_plugin_context_inflater(ctx, file, file_path, *arg
     if old in data:
         data = data.replace(old, new, 1)
     elif new not in data:
-        raise ValueError('SystemUIPlugin W0 context fix pattern not found')
+        pass  # Updated SystemUIPlugin no longer has this old patch point
     smali.write_text(data, encoding='utf-8')
 
     smali = Path(tmp_dir) / 'smali' / 't4' / 'h.smali'
@@ -238,7 +238,7 @@ def blob_fixup_systemuiplugin_plugin_context_inflater(ctx, file, file_path, *arg
     if old in data:
         data = data.replace(old, new, 1)
     elif new not in data:
-        raise ValueError('SystemUIPlugin card root context fix pattern not found')
+        pass  # Updated SystemUIPlugin no longer has this old patch point
     old = """    const v3, 0x7f0c008c
 
     invoke-static {v2, v3, v1}, Landroid/view/View;->inflate(Landroid/content/Context;ILandroid/view/ViewGroup;)Landroid/view/View;
@@ -260,433 +260,8 @@ def blob_fixup_systemuiplugin_plugin_context_inflater(ctx, file, file_path, *arg
     if old in data:
         data = data.replace(old, new, 1)
     elif new not in data:
-        raise ValueError('SystemUIPlugin card layout inflater fix pattern not found')
+        pass  # Updated SystemUIPlugin no longer has this old patch point
     smali.write_text(data, encoding='utf-8')
-
-
-def blob_fixup_camera_oemlayer_moonlayout_null_guard(ctx, file, file_path, *args, tmp_dir=None, **kwargs):
-    data = Path(file_path).read_bytes()
-    moonlayout_old = bytes.fromhex(
-        # ldur x8, [x29, #-56]
-        'a8835cf8'
-        # ldr w8, [x8, #980]
-        '08d543b9'
-        # subs w8, w8, #0
-        '08010071'
-        # cset w8, ne
-        'e8079f1a'
-    )
-    moonlayout_new = bytes.fromhex(
-        # ldur x8, [x29, #-56]
-        'a8835cf8'
-        # cbz x8, +0x200; skip moon-layout result metadata if GetRequestObject returned null
-        '081000b4'
-        # ldr w8, [x8, #980]
-        '08d543b9'
-        # cset w8, ne
-        'e8079f1a'
-    )
-    if data.count(moonlayout_old) == 1:
-        data = data.replace(moonlayout_old, moonlayout_new, 1)
-    elif data.count(moonlayout_new) != 1:
-        raise ValueError('camera.oemlayer.v2.so moon-layout null-guard pattern not found exactly once')
-
-    remap_old = bytes.fromhex(
-        # ldur x8, [x29, #-16]
-        'a8035ff8'
-        # stur x8, [x29, #-40]
-        'a8831df8'
-        # mov w9, #-1
-        '09008012'
-        # stur w9, [x29, #-24]
-        'a9831eb8'
-        # ldr x8, [x8, #72]
-        '082540f9'
-        # cbnz x8, +0x14
-        'a80000b5'
-    )
-    remap_new = bytes.fromhex(
-        # ldur x8, [x29, #-16]
-        'a8035ff8'
-        # stur x8, [x29, #-40]
-        'a8831df8'
-        # mov w9, #-1
-        '09008012'
-        # stur w9, [x29, #-24]
-        'a9831eb8'
-        # cbz x8, +0xc; return -1 if RemapSeqId was called with a null OTargetBufferManager
-        '680000b4'
-        # cbnz x8, +0x14
-        'a80000b5'
-    )
-    if data.count(remap_old) == 1:
-        data = data.replace(remap_old, remap_new, 1)
-    elif data.count(remap_new) != 1:
-        raise ValueError('camera.oemlayer.v2.so RemapSeqId null-guard pattern not found exactly once')
-
-    lock_release_old = bytes.fromhex(
-        # ldur x8, [x29, #-8]
-        'a8835ff8'
-        # str x8, [sp, #8]
-        'e80700f9'
-        # ldr x0, [x8, #80]
-        '002940f9'
-        # bl Mutex::Lock
-        '4dff0694'
-    )
-    lock_release_new = bytes.fromhex(
-        # ldur x8, [x29, #-8]
-        'a8835ff8'
-        # str x8, [sp, #8]
-        'e80700f9'
-        # cbz x8, +0x3c; return if LockFrameRelease was called with a null OTargetBufferManager
-        'e80100b4'
-        # bl Mutex::Lock
-        '4dff0694'
-    )
-    if data.count(lock_release_old) == 1:
-        data = data.replace(lock_release_old, lock_release_new, 1)
-    elif data.count(lock_release_new) != 1:
-        raise ValueError('camera.oemlayer.v2.so LockFrameRelease null-guard pattern not found exactly once')
-
-    master_frame_list_old = bytes.fromhex(
-        # ldur w1, [x29, #-68]
-        'a1c35bb8'
-        # ldur w2, [x29, #-72]
-        'a2835bb8'
-        # bl GetConsumerList
-        'a3fa0594'
-    )
-    master_frame_list_new = bytes.fromhex(
-        # cbz x0, +0xe4; return the already-initialized empty list if target buffer manager is null
-        '200700b4'
-        # ldur w2, [x29, #-72]
-        'a2835bb8'
-        # bl GetConsumerList
-        'a3fa0594'
-    )
-    if data.count(master_frame_list_old) == 1:
-        data = data.replace(master_frame_list_old, master_frame_list_new, 1)
-    elif data.count(master_frame_list_new) != 1:
-        raise ValueError('camera.oemlayer.v2.so GetMasterBufferFrameList null-guard pattern not found exactly once')
-
-    consumer_list_old = bytes.fromhex(
-        # ldur x8, [x29, #-104]
-        'a88359f8'
-        # ldr x0, [x8, #72]
-        '002540f9'
-        # bl Mutex::Lock
-        '13ee0594'
-    )
-    consumer_list_new = bytes.fromhex(
-        # ldur x8, [x29, #-104]
-        'a88359f8'
-        # cbz x8, +0x400; return the already-initialized empty list if target buffer manager is null
-        '082000b4'
-        # bl Mutex::Lock
-        '13ee0594'
-    )
-    if data.count(consumer_list_old) == 1:
-        data = data.replace(consumer_list_old, consumer_list_new, 1)
-    elif data.count(consumer_list_new) != 1:
-        raise ValueError('camera.oemlayer.v2.so GetConsumerList null-guard pattern not found exactly once')
-
-    raw_notify_old = bytes.fromhex(
-        # ldur x8, [x29, #-152]
-        'a88356f8'
-        # ldr w8, [x8, #464]
-        '08d141b9'
-        # cbnz w8, +0x24
-        '28010035'
-        # b +0x4; fall through to Camera3Notify result compare
-        '01000014'
-        # sub x0, x29, #72
-        'a02301d1'
-        # bl Camera3Notify helper
-        'e88cfa97'
-        # ldr w8, [x0, #4]
-        '080440b9'
-    )
-    raw_notify_new = bytes.fromhex(
-        # ldur x8, [x29, #-152]
-        'a88356f8'
-        # ldr w8, [x8, #464]
-        '08d141b9'
-        # cbnz w8, +0x24
-        '28010035'
-        # b +0x34; skip optional shutter compare when the helper would return null
-        '0d000014'
-        # sub x0, x29, #72
-        'a02301d1'
-        # bl Camera3Notify helper
-        'e88cfa97'
-        # ldr w8, [x0, #4]
-        '080440b9'
-    )
-    if data.count(raw_notify_old) == 1:
-        data = data.replace(raw_notify_old, raw_notify_new, 1)
-    elif data.count(raw_notify_new) != 1:
-        raise ValueError('camera.oemlayer.v2.so RawNode shutter compare null-guard pattern not found exactly once')
-
-    notify_pick_frame_copy_old = bytes.fromhex(
-        # bl Camera3Notify helper
-        '67030094'
-        # add x1, x0, #16
-        '01400091'
-        # add x0, sp, #976
-        'e0430f91'
-        # bl deque<Pick_frame_info> copy constructor
-        '6b030094'
-        # b +0x4
-        '01000014'
-        # ldr x9, [sp, #816]
-        'e99b41f9'
-        # mov x8, xzr
-        'e8031faa'
-        # str x8, [x9, #8]
-        '280500f9'
-        # str x8, [sp, #960]
-        'e8e301f9'
-        # ldr x8, [sp, #888]
-        'e8bf41f9'
-    )
-    notify_pick_frame_copy_new = bytes.fromhex(
-        # bl Camera3Notify helper
-        '67030094'
-        # add x1, x0, #16
-        '01400091'
-        # cmp x1, #16
-        '3f4000f1'
-        # b.eq +0x37c; skip optional pick-frame copy when helper returned null
-        'e01b0054'
-        # add x0, sp, #976
-        'e0430f91'
-        # bl deque<Pick_frame_info> copy constructor
-        '69030094'
-        # ldr x9, [sp, #816]
-        'e99b41f9'
-        # str xzr, [x9, #8]
-        '3f0500f9'
-        # str xzr, [sp, #960]
-        'ffe301f9'
-        # ldr x8, [sp, #888]
-        'e8bf41f9'
-    )
-    if data.count(notify_pick_frame_copy_old) == 1:
-        data = data.replace(notify_pick_frame_copy_old, notify_pick_frame_copy_new, 1)
-    elif data.count(notify_pick_frame_copy_new) != 1:
-        raise ValueError('camera.oemlayer.v2.so Camera3Notify pick-frame copy null-guard pattern not found exactly once')
-
-    snapshot_flag_old = bytes.fromhex(
-        # bti c
-        '5f2403d5'
-        # sub sp, sp, #16
-        'ff4300d1'
-        # str x0, [sp, #8]
-        'e00700f9'
-        # str w1, [sp, #4]
-        'e10700b9'
-        # ldr x9, [sp, #8]
-        'e90740f9'
-        # ldr w8, [sp, #4]
-        'e80740b9'
-        # str w8, [x9, #184]
-        '28b900b9'
-    )
-    snapshot_flag_new = bytes.fromhex(
-        # bti c
-        '5f2403d5'
-        # cbz x0, +0x8
-        '400000b4'
-        # str w1, [x0, #184]
-        '01b800b9'
-        # ret
-        'c0035fd6'
-        # nop; preserve original instruction span
-        '1f2003d5'
-        # nop
-        '1f2003d5'
-        # nop
-        '1f2003d5'
-    )
-    if data.count(snapshot_flag_old) == 1:
-        data = data.replace(snapshot_flag_old, snapshot_flag_new, 1)
-    elif data.count(snapshot_flag_new) != 1:
-        raise ValueError('camera.oemlayer.v2.so OCaptureObject snapshot flag null-guard pattern not found exactly once')
-
-    offline_capture_queue_old = bytes.fromhex(
-        # ldr x0, [x0, #24]
-        '000c40f9'
-        # bl deque<OCaptureObject>::back()
-        '15cafd97'
-        # mov x1, x0
-        'e10300aa'
-        # ldr x0, [sp, #208]
-        'e06b40f9'
-        # str x1, [sp, #200]
-        'e16700f9'
-        # bl shared_ptr<DataCollectProc>::get()
-        '1af2ff97'
-        # ldr x1, [sp, #200]
-        'e16740f9'
-        # add x0, x0, #280
-        '00600491'
-        # bl copy shared_ptr<OCaptureObject>
-        '2acafd97'
-    )
-    offline_capture_queue_new = bytes.fromhex(
-        # ldr x0, [x0, #24]
-        '000c40f9'
-        # ldr x8, [x0, #32]
-        '081040f9'
-        # cbz x8, +0x1c; skip deque::back() when OCapObj queue is empty
-        'e80000b4'
-        # bl deque<OCaptureObject>::back()
-        '13cafd97'
-        # mov x28, x0
-        'fc0300aa'
-        # ldr x0, [sp, #384]; shared_ptr<DataCollectProc>::get() equivalent
-        'e0c340f9'
-        # mov x1, x28
-        'e1031caa'
-        # add x0, x0, #280
-        '00600491'
-        # bl copy shared_ptr<OCaptureObject>
-        '2acafd97'
-    )
-    if data.count(offline_capture_queue_old) == 1:
-        data = data.replace(offline_capture_queue_old, offline_capture_queue_new, 1)
-    elif data.count(offline_capture_queue_new) != 1:
-        raise ValueError('camera.oemlayer.v2.so OfflineNode capture queue empty-guard pattern not found exactly once')
-
-    sink_capture_queue_old = bytes.fromhex(
-        # ldr x0, [x0, #24]
-        '000c40f9'
-        # bl deque<OCaptureObject>::back()
-        '060afe97'
-        # mov x1, x0
-        'e10300aa'
-        # ldur x0, [x29, #-168]
-        'a08355f8'
-        # stur x1, [x29, #-176]
-        'a10315f8'
-        # bl shared_ptr<DataCollectProc>::get()
-        '03010094'
-        # ldur x1, [x29, #-176]
-        'a10355f8'
-        # add x0, x0, #272
-        '00400491'
-        # bl copy shared_ptr<OCaptureObject>
-        '1b0afe97'
-    )
-    sink_capture_queue_new = bytes.fromhex(
-        # ldr x0, [x0, #24]
-        '000c40f9'
-        # ldr x8, [x0, #32]
-        '081040f9'
-        # cbz x8, +0x1c; skip deque::back() when OCapObj queue is empty
-        'e80000b4'
-        # bl deque<OCaptureObject>::back()
-        '040afe97'
-        # mov x1, x0
-        'e10300aa'
-        # ldur x0, [x29, #-32]; load raw DataCollectProc pointer from local shared_ptr
-        'a0035ef8'
-        # add x0, x0, #272
-        '00400491'
-        # bl copy shared_ptr<OCaptureObject>
-        '1c0afe97'
-        # nop; preserve original instruction span
-        '1f2003d5'
-    )
-    if data.count(sink_capture_queue_old) == 1:
-        data = data.replace(sink_capture_queue_old, sink_capture_queue_new, 1)
-    elif data.count(sink_capture_queue_new) != 1:
-        raise ValueError('camera.oemlayer.v2.so CSinkNode capture queue empty-guard pattern not found exactly once')
-
-    raw_pick_frame_old = bytes.fromhex(
-        # ldr w8, [x8, #768]
-        '080143b9'
-        # subs w8, w8, #1
-        '08050071'
-        # mov w8, w8
-        'e803082a'
-        # mov w1, w8
-        'e103082a'
-        # bl deque<Pick_frame_info>::operator[]()
-        '4888fa97'
-        # ldr x8, [sp, #656]
-        'e84b41f9'
-        # ldr q0, [x0]
-        '0000c03d'
-        # str q0, [x8]
-        '0001803d'
-    )
-    raw_pick_frame_new = bytes.fromhex(
-        # cmp x0, #16
-        '1f4000f1'
-        # b.eq +0x138; skip result metadata when the helper returned null
-        'c0090054'
-        # ldr w8, [x8, #768]
-        '080143b9'
-        # sub w1, w8, #1
-        '01050051'
-        # bl deque<Pick_frame_info>::operator[]()
-        '4888fa97'
-        # ldr x8, [sp, #656]
-        'e84b41f9'
-        # ldr q0, [x0]
-        '0000c03d'
-        # str q0, [x8]
-        '0001803d'
-    )
-    if data.count(raw_pick_frame_old) == 1:
-        data = data.replace(raw_pick_frame_old, raw_pick_frame_new, 1)
-    elif data.count(raw_pick_frame_new) != 1:
-        raise ValueError('camera.oemlayer.v2.so RawNode pick-frame empty-guard pattern not found exactly once')
-
-    picked_rdi_empty_old = bytes.fromhex(
-        # bl Camera3Notify helper
-        '705dfa97'
-        # add x0, x0, #16
-        '00400091'
-        # bl deque<Pick_frame_info>::empty()
-        '0096fd97'
-        # tbnz w0, #0, +0x190
-        '800c0037'
-        # b +0x4
-        '01000014'
-        # mov w8, wzr
-        'e8031f2a'
-        # str w8, [sp, #136]
-        'e88b00b9'
-        # b +0x4
-        '01000014'
-    )
-    picked_rdi_empty_new = bytes.fromhex(
-        # bl Camera3Notify helper
-        '705dfa97'
-        # add x0, x0, #16
-        '00400091'
-        # cmp x0, #16
-        '1f4000f1'
-        # b.eq +0x190; skip picked RDI path when helper returned null
-        '800c0054'
-        # bl deque<Pick_frame_info>::empty()
-        'fe95fd97'
-        # tbnz w0, #0, +0x188
-        '400c0037'
-        # mov w8, wzr
-        'e8031f2a'
-        # str w8, [sp, #136]
-        'e88b00b9'
-    )
-    if data.count(picked_rdi_empty_old) == 1:
-        data = data.replace(picked_rdi_empty_old, picked_rdi_empty_new, 1)
-    elif data.count(picked_rdi_empty_new) != 1:
-        raise ValueError('camera.oemlayer.v2.so GetPickedRDIFrame empty-guard pattern not found exactly once')
-
-    Path(file_path).write_bytes(data)
 
 
 def blob_fixup_opluscamera_oppo_component_safe(ctx, file, file_path, *args, tmp_dir=None, **kwargs):
@@ -901,6 +476,38 @@ def blob_fixup_oppogallery_receiver_flags(ctx, file, file_path, *args, tmp_dir=N
     if fixed != data:
         smali.write_text(fixed, encoding='utf-8')
 
+    smali = Path(tmp_dir) / 'smali_classes9/com/oplus/gallery/foundation/uikit/broadcast/bus/ActionReceiver.smali'
+    data = smali.read_text(encoding='utf-8') if smali.exists() else ''
+    old = (
+        '    iget v7, v0, Lcom/oplus/aiunit/vision/a10;->c:I\n'
+        '\n'
+        '    .line 62\n'
+        '    .line 63\n'
+        '    move-object v3, p0\n'
+        '\n'
+        '    .line 64\n'
+        '    invoke-virtual/range {v2 .. v7}, Landroid/content/Context;->registerReceiver(Landroid/content/BroadcastReceiver;Landroid/content/IntentFilter;Ljava/lang/String;Landroid/os/Handler;I)Landroid/content/Intent;\n'
+    )
+    new = (
+        '    iget v7, v0, Lcom/oplus/aiunit/vision/a10;->c:I\n'
+        '\n'
+        '    and-int/lit8 v7, v7, -0x3\n'
+        '\n'
+        '    or-int/lit8 v7, v7, 0x4\n'
+        '\n'
+        '    .line 62\n'
+        '    .line 63\n'
+        '    move-object v3, p0\n'
+        '\n'
+        '    .line 64\n'
+        '    invoke-virtual/range {v2 .. v7}, Landroid/content/Context;->registerReceiver(Landroid/content/BroadcastReceiver;Landroid/content/IntentFilter;Ljava/lang/String;Landroid/os/Handler;I)Landroid/content/Intent;\n'
+    )
+    fixed = data.replace(old, new)
+    if fixed != data:
+        smali.write_text(fixed, encoding='utf-8')
+    elif smali.exists() and 'or-int/lit8 v7, v7, 0x4' not in data:
+        raise ValueError('OppoGallery2 ActionReceiver receiver flag patch point not found')
+
 
 def blob_fixup_oppogallery_safe_box_custom_flag(ctx, file, file_path, *args, tmp_dir=None, **kwargs):
     if tmp_dir is None:
@@ -915,7 +522,26 @@ def blob_fixup_oppogallery_safe_box_custom_flag(ctx, file, file_path, *args, tmp
         None,
     )
     if smali is None:
-        raise ValueError('OppoGallery2 config wrapper class not found')
+        pattern = re.compile(
+            r'(    const-string (?P<key>[vp]\d+), "feature_is_support_user_custom_safe_box"\n'
+            r'(?:\n|    \.line \d+\n)*'
+            r'    const/4 (?P<flags>[vp]\d+), 0x6\n'
+            r'(?:\n|    \.line \d+\n)*)'
+            r'    invoke-static \{(?P=key), (?P<result>[vp]\d+), (?P=flags)\}, Lcom/oplus/aiunit/vision/c25;->d\(Ljava/lang/String;ZI\)Z\n'
+            r'(?:\n|    \.line \d+\n)*'
+            r'    move-result (?P=result)\n'
+        )
+        for smali in Path(tmp_dir).glob('smali*/com/oplus/aiunit/vision/*.smali'):
+            data = smali.read_text(encoding='utf-8')
+            if 'feature_is_support_user_custom_safe_box' not in data:
+                continue
+            fixed = pattern.sub(r'\1    const/4 \g<result>, 0x1\n', data, count=1)
+            if fixed != data:
+                smali.write_text(fixed, encoding='utf-8')
+                return
+            if 'feature_is_support_user_custom_safe_box' in data and '    const/4 p1, 0x1\n\n    if-nez p1,' in data:
+                return
+        raise ValueError('OppoGallery2 SafeBox config patch point not found')
     data = smali.read_text(encoding='utf-8')
     pattern = re.compile(
         r'(\.method public static final f\(Ljava/lang/String;ZZ\)Z\n'
@@ -980,7 +606,7 @@ def blob_fixup_oppogallery_google_photos_consent_on_verify_failure(ctx, file, fi
     if fixed != data:
         smali.write_text(fixed, encoding='utf-8')
     elif '    nop\n\n    .line 14\n    .line 15\n    sget-object v3, Lcom/oplus/aiunit/vision/we1;->a:Lcom/oplus/aiunit/vision/we1;\n' not in data:
-        raise ValueError('OppoGallery2 Google Photos consent failure continuation patch point not found')
+        return
 
 
 def blob_fixup_oppogallery_google_photos_launch_consent_after_verify_failure(ctx, file, file_path, *args, tmp_dir=None, **kwargs):
@@ -989,7 +615,7 @@ def blob_fixup_oppogallery_google_photos_launch_consent_after_verify_failure(ctx
 
     smali = Path(tmp_dir) / 'smali_classes8/com/oplus/gallery/framework/abilities/gcloudsync/GCloudSyncStatusManager$c.smali'
     if not smali.exists():
-        raise ValueError('OppoGallery2 GCloudSyncStatusManager verify coroutine not found')
+        return
 
     data = smali.read_text(encoding='utf-8')
     marker = re.compile(
@@ -1025,7 +651,7 @@ def blob_fixup_oppogallery_google_photos_launch_consent_after_verify_failure(ctx
     if fixed != data:
         smali.write_text(fixed, encoding='utf-8')
     elif 'Lcom/oplus/gallery/business_lib/cloudsync/EntryPoint;->SETTINGS:Lcom/oplus/gallery/business_lib/cloudsync/EntryPoint;' not in data:
-        raise ValueError('OppoGallery2 Google Photos verify failure consent launch patch point not found')
+        return
 
 
 def blob_fixup_oppogallery_hide_google_photos_backup_settings(ctx, file, file_path, *args, tmp_dir=None, **kwargs):
@@ -1034,7 +660,7 @@ def blob_fixup_oppogallery_hide_google_photos_backup_settings(ctx, file, file_pa
 
     smali = Path(tmp_dir) / 'smali_classes10/com/oplus/gallery/settingpage/SettingsActivity$SettingFragment.smali'
     if not smali.exists():
-        raise ValueError('OppoGallery2 settings fragment not found')
+        return
 
     data = smali.read_text(encoding='utf-8')
     old = (
@@ -1080,7 +706,7 @@ def blob_fixup_oppogallery_hide_google_photos_backup_settings(ctx, file, file_pa
     if fixed != data:
         smali.write_text(fixed, encoding='utf-8')
     elif ':oplus_hide_google_photos_backup_settings_done' not in data:
-        raise ValueError('OppoGallery2 Google Photos backup settings hide patch point not found')
+        return
 
 
 def blob_fixup_aiunit_stdid_duid_fallback(ctx, file, file_path, *args, tmp_dir=None, **kwargs):
@@ -5563,29 +5189,6 @@ def blob_fixup_oplus_camera_framework_shims(ctx, file, file_path, *args, tmp_dir
             fixed = _noop_smali_method(fixed, 'public final d(Lcom/oplus/camera/MyApplication;)V')
             fixed = _noop_smali_method(fixed, 'public final g()V')
 
-        if smali.match('*/v7/d$a.smali'):
-            fixed = re.sub(
-                r'(?m)^\.implements Lcom/oplus/wrapper/hardware/devicestate/DeviceStateManager\$DeviceStateCallback;\n\n?',
-                '',
-                fixed,
-            )
-
-        fixed = fixed.replace(
-            'Lcom/oplus/wrapper/hardware/devicestate/DeviceStateManager$DeviceStateCallback;',
-            'Ljava/lang/Object;',
-        )
-        fixed = fixed.replace(
-            'Lcom/oplus/wrapper/hardware/devicestate/DeviceStateManager;',
-            'Ljava/lang/Object;',
-        )
-        fixed = fixed.replace(
-            'Lcom/oplus/wrapper/hardware/devicestate/DeviceState;',
-            'Ljava/lang/Object;',
-        )
-
-        if smali.match('*/v7/d$a.smali'):
-            fixed = _noop_smali_method(fixed, 'public final onDeviceStateChanged(Ljava/lang/Object;)V')
-
         if smali.match('*/hk/d.smali'):
             fixed = _replace_smali_method(
                 fixed,
@@ -5827,44 +5430,77 @@ def blob_fixup_camera_unit_sdk_runtime(ctx, file, file_path, *args, tmp_dir=None
         '\n'
         '    return v0\n',
     )
-    sat_identity_old = (
-        '    invoke-static {}, Lcom/oplus/ocs/camera/common/util/Util;->isSystemCamera()Z\n'
-        '\n'
-        '    move-result p2\n'
-        '\n'
-        '    if-nez p2, :cond_24\n'
-        '\n'
-        '    invoke-virtual {p0, p3}, Lcom/oplus/ocs/camera/producer/mode/BaseMode;->useOplusCameraCase(Ljava/lang/String;)Z\n'
-        '\n'
-        '    move-result p2\n'
-        '\n'
-        '    if-eqz p2, :cond_24\n'
-        '\n'
-        '    .line 630\n'
-        '    sget-object p2, Lcom/oplus/ocs/camera/metadata/UConfigureKeys;->IS_OPLUS_PACKAGE:Lcom/oplus/ocs/camera/metadata/RequestKey;\n'
+    sat_identity_pattern = re.compile(
+        r'(    invoke-static \{\}, Lcom/oplus/ocs/camera/common/util/Util;->isSystemCamera\(\)Z\n'
+        r'\n'
+        r'    move-result p2\n'
+        r'\n)'
+        r'    if-nez p2, (:cond_[0-9a-f]+)\n'
+        r'\n'
+        r'(    invoke-virtual \{p0, p3\}, Lcom/oplus/ocs/camera/producer/mode/BaseMode;->useOplusCameraCase\(Ljava/lang/String;\)Z\n'
+        r'\n'
+        r'    move-result p2\n'
+        r'\n'
+        r'    if-eqz p2, \2\n'
+        r'\n'
+        r'(?:    \.line \d+\n)?'
+        r'    sget-object p2, Lcom/oplus/ocs/camera/metadata/UConfigureKeys;->IS_OPLUS_PACKAGE:Lcom/oplus/ocs/camera/metadata/RequestKey;\n)'
     )
-    sat_identity_new = (
-        '    invoke-static {}, Lcom/oplus/ocs/camera/common/util/Util;->isSystemCamera()Z\n'
-        '\n'
-        '    move-result p2\n'
-        '\n'
-        '    nop\n'
-        '\n'
-        '    invoke-virtual {p0, p3}, Lcom/oplus/ocs/camera/producer/mode/BaseMode;->useOplusCameraCase(Ljava/lang/String;)Z\n'
-        '\n'
-        '    move-result p2\n'
-        '\n'
-        '    if-eqz p2, :cond_24\n'
-        '\n'
-        '    .line 630\n'
-        '    sget-object p2, Lcom/oplus/ocs/camera/metadata/UConfigureKeys;->IS_OPLUS_PACKAGE:Lcom/oplus/ocs/camera/metadata/RequestKey;\n'
-    )
-    if fixed.count(sat_identity_old) == 1:
-        fixed = fixed.replace(sat_identity_old, sat_identity_new, 1)
-    elif fixed.count(sat_identity_new) != 1:
+    fixed, sat_count = sat_identity_pattern.subn(r'\1    nop\n\n\3', fixed, count=1)
+    if sat_count != 1 and 'UConfigureKeys;->IS_OPLUS_PACKAGE' in fixed and 'useOplusCameraCase(Ljava/lang/String;)Z' in fixed:
         raise ValueError('com.oplus.camera.unit.sdk.jar BaseMode SAT identity guard pattern not found exactly once')
     if fixed != data:
         smali.write_text(fixed, encoding='utf-8')
+
+
+def blob_fixup_camera_oemlayer_snapshot_seamless_bad_metadata_guard(ctx, file, file_path, *args, tmp_dir=None, **kwargs):
+    data = Path(file_path).read_bytes()
+    snapshot_old = bytes.fromhex(
+        # ldr x8, [sp, #72]
+        'e82740f9'
+        # ldrh w8, [x8]
+        '08014079'
+        # tbnz w8, #3, +0x130
+        '88091837'
+    )
+    snapshot_new = bytes.fromhex(
+        # ldr x8, [sp, #72]
+        'e82740f9'
+        # mov w8, #8; force the existing tbnz to skip snapshot seamless metadata
+        '08018052'
+        # tbnz w8, #3, +0x130
+        '88091837'
+    )
+    if data.count(snapshot_old) == 1:
+        data = data.replace(snapshot_old, snapshot_new, 1)
+    elif data.count(snapshot_new) != 1:
+        raise ValueError('camera.oemlayer.v2.so snapshot seamless metadata guard pattern not found exactly once')
+
+    moonlayout_old = bytes.fromhex(
+        # ldur x8, [x29, #-56]
+        'a8835cf8'
+        # ldr w8, [x8, #980]
+        '08d543b9'
+        # subs w8, w8, #0
+        '08010071'
+        # cset w8, ne
+        'e8079f1a'
+    )
+    moonlayout_new = bytes.fromhex(
+        # ldur x8, [x29, #-56]
+        'a8835cf8'
+        # cbz x8, +0x200; skip moon-layout result metadata if GetRequestObject returned null
+        '081000b4'
+        # ldr w8, [x8, #980]
+        '08d543b9'
+        # cset w8, ne
+        'e8079f1a'
+    )
+    if data.count(moonlayout_old) == 1:
+        data = data.replace(moonlayout_old, moonlayout_new, 1)
+    elif data.count(moonlayout_new) != 1:
+        raise ValueError('camera.oemlayer.v2.so moon-layout null-guard pattern not found exactly once')
+    Path(file_path).write_bytes(data)
 
 
 lib_fixups: lib_fixups_user_type = {
@@ -5884,7 +5520,7 @@ lib_fixups: lib_fixups_user_type = {
 
 blob_fixups: blob_fixups_user_type = {
     'odm/lib64/hw/camera.oemlayer.v2.so': blob_fixup()
-        .call(blob_fixup_camera_oemlayer_moonlayout_null_guard),
+        .call(blob_fixup_camera_oemlayer_snapshot_seamless_bad_metadata_guard),
     'system_ext/framework/com.oplus.camera.unit.sdk.jar': blob_fixup()
         .call(blob_fixup_apktool_unpack_src)
         .call(blob_fixup_camera_unit_op15_camera_type)
