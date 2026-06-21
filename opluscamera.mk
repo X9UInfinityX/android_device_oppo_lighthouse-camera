@@ -43,7 +43,10 @@ PRODUCT_PACKAGES += \
     libQnnHtpV81Stub_gallery_app_lib \
     libQnnHtpV81CalculatorStub_gallery_app_lib \
     libQnnSaver_gallery_app_lib \
-    libQnnSystem_gallery_app_lib
+    libQnnSystem_gallery_app_lib \
+    libNativeWinBuffExchange_camera_app_lib \
+    libHeifEncoderWrapper_camera_app_lib \
+    libHeifWinBufExchg-jni
 
 # Properties
 PRODUCT_PRODUCT_PROPERTIES += \
