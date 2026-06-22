@@ -362,6 +362,35 @@ def blob_fixup_cryptoeng_permissions_xml(ctx, file, file_path, *args, tmp_dir=No
         path.write_text(fixed, encoding='utf-8')
 
 
+def blob_fixup_cryptoeng_init_rc(ctx, file, file_path, *args, tmp_dir=None, **kwargs):
+    path = Path(file_path)
+    data = path.read_text(encoding='utf-8')
+    data = data.replace(
+        '    mkdir /data/vendor_de/0/cryptoeng 0770 system system encryption=None\n',
+        '    mkdir /data/vendor_de/0/cryptoeng 0770 system system encryption=None\n'
+        '    restorecon_recursive /data/vendor_de/0/cryptoeng\n',
+        1,
+    )
+    old = (
+        '    if [ "$(getprop ro.soc.model)" = "SM6450" ]; then\n'
+        '        copy /vendor/etc/oplus_PPID_licenses.pfm /mnt/vendor/persist/data/pfm/licenses/oplus_PPID_licenses.pfm\n'
+        '        chmod 0600 /mnt/vendor/persist/data/pfm/licenses/oplus_PPID_licenses.pfm\n'
+        '        chown system system /mnt/vendor/persist/data/pfm/licenses/oplus_PPID_licenses.pfm\n'
+        '    fi\n'
+    )
+    fixed = data.replace(old, '')
+    if fixed != data:
+        path.write_text(fixed, encoding='utf-8')
+
+
+def blob_fixup_cryptoeng_manifest(ctx, file, file_path, *args, tmp_dir=None, **kwargs):
+    path = Path(file_path)
+    data = path.read_text(encoding='utf-8')
+    data = data.replace('<!--\n    <hal format="hidl">', '    <hal format="hidl">')
+    data = data.replace('    </hal>\n-->\n    <hal format="aidl">', '    </hal>\n    <hal format="aidl">')
+    path.write_text(data, encoding='utf-8')
+
+
 def blob_fixup_safecenter_receiver_flags(ctx, file, file_path, *args, tmp_dir=None, **kwargs):
     if tmp_dir is None:
         return
@@ -402,6 +431,33 @@ def blob_fixup_safecenter_receiver_flags(ctx, file, file_path, *args, tmp_dir=No
         smali.write_text(fixed, encoding='utf-8')
     elif 'registerReceiver(Landroid/content/BroadcastReceiver;Landroid/content/IntentFilter;Ljava/lang/String;Landroid/os/Handler;I)' not in data:
         raise ValueError('SafeCenter receiver flag patch point not found')
+
+
+def blob_fixup_safecenter_olock_support(ctx, file, file_path, *args, tmp_dir=None, **kwargs):
+    if tmp_dir is None:
+        return
+
+    smali = Path(tmp_dir) / 'smali_classes2/j7/k.smali'
+    data = smali.read_text(encoding='utf-8') if smali.exists() else ''
+    fixed = _replace_smali_method(
+        data,
+        'public final J(Landroid/content/Context;)Z',
+        '    .locals 2\n'
+        '\n'
+        '    const-string p0, "OLockManager"\n'
+        '\n'
+        '    const-string p1, "[isSupportOLock] force enabled for port"\n'
+        '\n'
+        '    invoke-static {p0, p1}, Lx6/a;->h(Ljava/lang/String;Ljava/lang/String;)V\n'
+        '\n'
+        '    const/4 v0, 0x1\n'
+        '\n'
+        '    return v0\n',
+    )
+    if fixed != data:
+        smali.write_text(fixed, encoding='utf-8')
+    else:
+        raise ValueError('SafeCenter OLock support patch point not found')
 
 
 def blob_fixup_securitypermission_safe_permissions(ctx, file, file_path, *args, tmp_dir=None, **kwargs):
@@ -5592,10 +5648,17 @@ blob_fixups: blob_fixups_user_type = {
         .call(blob_fixup_apktool_unpack_full)
         .call(blob_fixup_opluscamera_uses_library)
         .call(blob_fixup_safecenter_receiver_flags)
+        .call(blob_fixup_safecenter_olock_support)
         .apktool_pack()
         .stripzip(),
     'system_ext/etc/permissions/vendor-oplus-hardware-cryptoeng.xml': blob_fixup()
         .call(blob_fixup_cryptoeng_permissions_xml),
+    'odm/etc/permissions/vendor-oplus-hardware-cryptoeng.xml': blob_fixup()
+        .call(blob_fixup_cryptoeng_permissions_xml),
+    'odm/etc/init/vendor.oplus.hardware.cryptoeng@1.0-service_FDE.rc': blob_fixup()
+        .call(blob_fixup_cryptoeng_init_rc),
+    'odm/etc/vintf/manifest/manifest_oplus_cryptoeng.xml': blob_fixup()
+        .call(blob_fixup_cryptoeng_manifest),
     'system_ext/app/FileManager/FileManager.apk': blob_fixup()
         .call(blob_fixup_apktool_unpack_full)
         .call(blob_fixup_opluscamera_uses_library)

@@ -1,0 +1,15 @@
+type vendor_hal_cryptoeng_oplus, domain;
+init_daemon_domain(vendor_hal_cryptoeng_oplus)
+
+add_service(vendor_hal_cryptoeng_oplus, vendor_hal_cryptoeng_oplus_service)
+add_hwservice(vendor_hal_cryptoeng_oplus, vendor_hal_cryptoeng_oplus_hwservice)
+binder_use(vendor_hal_cryptoeng_oplus)
+binder_call(vendor_hal_cryptoeng_oplus, servicemanager)
+
+allow vendor_hal_cryptoeng_oplus tee_device:chr_file rw_file_perms;
+allow vendor_hal_cryptoeng_oplus vendor_dmabuf_qseecom_heap_device:chr_file r_file_perms;
+allow vendor_hal_cryptoeng_oplus vendor_dmabuf_qseecom_ta_heap_device:chr_file r_file_perms;
+
+allow vendor_hal_cryptoeng_oplus hidl_base_hwservice:hwservice_manager add;
+allow vendor_hal_cryptoeng_oplus system_app:dir search;
+allow vendor_hal_cryptoeng_oplus system_app:file r_file_perms;

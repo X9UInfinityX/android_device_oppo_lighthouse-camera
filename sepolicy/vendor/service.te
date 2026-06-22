@@ -1,0 +1,1 @@
+type vendor_hal_cryptoeng_oplus_service, hal_service_type, protected_service, service_manager_type;

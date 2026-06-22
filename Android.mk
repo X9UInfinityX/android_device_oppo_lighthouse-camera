@@ -37,14 +37,3 @@ endef
 
 $(eval $(call oplus-camera-app-lib,libNativeWinBuffExchange))
 $(eval $(call oplus-camera-app-lib,libHeifEncoderWrapper))
-
-include $(CLEAR_VARS)
-LOCAL_MODULE := libHeifWinBufExchg-jni
-LOCAL_MODULE_CLASS := SHARED_LIBRARIES
-LOCAL_MODULE_SUFFIX := .so
-LOCAL_MODULE_TAGS := optional
-LOCAL_SRC_FILES := ../../../vendor/oneplus/infiniti-camera/proprietary/system_ext/lib64/libHeifWinBufExchg-jni.so
-LOCAL_MODULE_PATH := $(TARGET_OUT_SYSTEM_EXT)/lib64
-LOCAL_CHECK_ELF_FILES := false
-LOCAL_STRIP_MODULE := false
-include $(BUILD_PREBUILT)

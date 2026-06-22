@@ -1,2 +1,4 @@
 type public_adsprpcd_file, file_type;
 type proc_ufs_file, fs_type, proc_type;
+type vendor_cryptoeng_vendor_data_file, file_type, data_file_type;
+type vendor_hal_cryptoeng_oplus_exec, exec_type, vendor_file_type, file_type;
