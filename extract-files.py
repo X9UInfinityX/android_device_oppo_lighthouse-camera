@@ -565,6 +565,59 @@ def blob_fixup_oppogallery_receiver_flags(ctx, file, file_path, *args, tmp_dir=N
         raise ValueError('OppoGallery2 ActionReceiver receiver flag patch point not found')
 
 
+def blob_fixup_oppogallery_wallpaper_attach_intent(ctx, file, file_path, *args, tmp_dir=None, **kwargs):
+    if tmp_dir is None:
+        return
+
+    smali = Path(tmp_dir) / 'smali_classes10/com/oplus/gallery/pictureeditorpage/PictureEditorDM.smali'
+    data = smali.read_text(encoding='utf-8') if smali.exists() else ''
+    replacement = (
+        '.method public final a(Landroid/app/Activity;Landroid/net/Uri;)V\n'
+        '    .locals 3\n'
+        '\n'
+        '    const-string p0, "activity"\n'
+        '\n'
+        '    invoke-static {p1, p0}, Lkotlin/jvm/internal/Intrinsics;->checkNotNullParameter(Ljava/lang/Object;Ljava/lang/String;)V\n'
+        '\n'
+        '    const-string p0, "pickedItem"\n'
+        '\n'
+        '    invoke-static {p2, p0}, Lkotlin/jvm/internal/Intrinsics;->checkNotNullParameter(Ljava/lang/Object;Ljava/lang/String;)V\n'
+        '\n'
+        '    new-instance v0, Landroid/content/Intent;\n'
+        '\n'
+        '    const-string v1, "android.intent.action.ATTACH_DATA"\n'
+        '\n'
+        '    invoke-direct {v0, v1}, Landroid/content/Intent;-><init>(Ljava/lang/String;)V\n'
+        '\n'
+        '    const-string v1, "image/*"\n'
+        '\n'
+        '    invoke-virtual {v0, p2, v1}, Landroid/content/Intent;->setDataAndType(Landroid/net/Uri;Ljava/lang/String;)Landroid/content/Intent;\n'
+        '\n'
+        '    const/4 v2, 0x1\n'
+        '\n'
+        '    invoke-virtual {v0, v2}, Landroid/content/Intent;->setFlags(I)Landroid/content/Intent;\n'
+        '\n'
+        '    const-string v2, "mimeType"\n'
+        '\n'
+        '    invoke-virtual {v0, v2, v1}, Landroid/content/Intent;->putExtra(Ljava/lang/String;Ljava/lang/String;)Landroid/content/Intent;\n'
+        '\n'
+        '    invoke-virtual {p1, v0}, Landroid/app/Activity;->startActivity(Landroid/content/Intent;)V\n'
+        '\n'
+        '    return-void\n'
+        '.end method\n'
+    )
+    fixed, count = re.subn(
+        r'\.method public final a\(Landroid/app/Activity;Landroid/net/Uri;\)V\n.*?\.end method',
+        replacement,
+        data,
+        count=1,
+        flags=re.DOTALL,
+    )
+    if count != 1:
+        raise ValueError('OppoGallery2 wallpaper attach intent patch point not found')
+    smali.write_text(fixed, encoding='utf-8')
+
+
 def blob_fixup_oppogallery_safe_box_custom_flag(ctx, file, file_path, *args, tmp_dir=None, **kwargs):
     if tmp_dir is None:
         return
@@ -5621,6 +5674,7 @@ blob_fixups: blob_fixups_user_type = {
         .call(blob_fixup_opluscamera_uses_library)
         .call(blob_fixup_oppogallery_op15_native_libs)
         .call(blob_fixup_oppogallery_receiver_flags)
+        .call(blob_fixup_oppogallery_wallpaper_attach_intent)
         .call(blob_fixup_oppogallery_safe_box_custom_flag)
         .call(blob_fixup_oppogallery_google_photos_consent_on_verify_failure)
         .call(blob_fixup_oppogallery_google_photos_launch_consent_after_verify_failure)
