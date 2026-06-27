@@ -1,0 +1,9 @@
+type occe_create, domain;
+init_daemon_domain(occe_create)
+
+allow occe_create occe_data_file:dir create_dir_perms;
+allow occe_create occe_data_file:file create_file_perms;
+allow occe_create gpu_device:chr_file rw_file_perms;
+allow occe_create same_process_hal_file:file { read open getattr execute map };
+
+dontaudit occe_create servicemanager:binder call;

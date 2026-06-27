@@ -553,3 +553,7 @@
 # This is labeled as public_adsprpcd_file as it needs to be read by apps
 # (e.g. Google Camera App)
 /mnt/vendor/dsp/fastrpc_shell_3                                              u:object_r:public_adsprpcd_file:s0
+
+# OCCE shader-cache precompiler service + /mnt/occe cache tree
+/(vendor|odm)/bin/occe_create                            u:object_r:occe_create_exec:s0
+/mnt/occe(/.*)?                                          u:object_r:occe_data_file:s0
