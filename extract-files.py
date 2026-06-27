@@ -112,6 +112,70 @@ def blob_fixup_apktool_unpack_full(ctx, file, file_path, *args, tmp_dir=None, **
     ])
 
 
+def blob_fixup_apktool_unpack_manifest(ctx, file, file_path, *args, tmp_dir=None, **kwargs):
+    if tmp_dir is None:
+        return
+
+    run_cmd([
+        java_path,
+        '-Xmx8g',
+        '-jar',
+        apktool_path,
+        'd',
+        file_path,
+        '-o',
+        tmp_dir,
+        '-f',
+        '-s',
+    ])
+
+
+def blob_fixup_opluscamera_font(ctx, file, file_path, *args, tmp_dir=None, **kwargs):
+    # OEM camera font-NPE neutralizer. The TypeFaceUtil static
+    # a(Context)->Typeface path reads OEM font framework state that is absent
+    # on LineageOS; return Typeface.DEFAULT instead.
+    if tmp_dir is None:
+        return
+
+    signature = 'public static a(Landroid/content/Context;)Landroid/graphics/Typeface;'
+    body = (
+        '    .locals 1\n'
+        '\n'
+        '    sget-object v0, Landroid/graphics/Typeface;->DEFAULT:Landroid/graphics/Typeface;\n'
+        '\n'
+        '    return-object v0\n'
+    )
+
+    for smali in Path(tmp_dir).glob('smali*/**/*.smali'):
+        data = smali.read_text(encoding='utf-8', errors='ignore')
+        if '"TypeFaceUtil"' not in data or f'.method {signature}' not in data:
+            continue
+        fixed = _replace_smali_method(data, signature, body)
+        if fixed != data:
+            smali.write_text(fixed, encoding='utf-8')
+        return
+
+
+def blob_fixup_strip_oem_permissions(ctx, file, file_path, *args, tmp_dir=None, **kwargs):
+    # Strip undefined OEM permission gates from component declarations while
+    # keeping the components registered.
+    if tmp_dir is None:
+        return
+
+    manifest = Path(tmp_dir) / 'AndroidManifest.xml'
+    if not manifest.exists():
+        return
+
+    data = manifest.read_text(encoding='utf-8')
+    fixed = re.sub(
+        r'\s+android:permission="(?:oplus|oppo|com\.oplus|com\.oppo|com\.heytap)[^"]*"',
+        '',
+        data,
+    )
+    if fixed != data:
+        manifest.write_text(fixed, encoding='utf-8')
+
+
 def blob_fixup_systemuiplugin_plugin_context_inflater(ctx, file, file_path, *args, tmp_dir=None, **kwargs):
     if tmp_dir is None:
         return
@@ -2247,6 +2311,7 @@ def blob_fixup_oplus_camera_framework_shims(ctx, file, file_path, *args, tmp_dir
             'com.oplus.flash.status': 'com.oplus.flashtrigger.state',
             'com.oplus.outflash.flashtype': 'com.oplus.flashtrigger.state',
             'com.oplus.preview.outflash.connected': 'com.oplus.flashtrigger.state',
+            'com.oplus.flash.IntensityControl': 'com.oplus.flashtrigger.state',
             'com.oplus.facebeauty.custom': 'com.oplus.facebeauty.level',
             'com.oplus.aec.customAE.enable': 'com.oplus.macro.closeup.enable',
             'com.oplus.DolIsStaggerState': 'com.oplus.capture.request.idx',
@@ -2276,6 +2341,7 @@ def blob_fixup_oplus_camera_framework_shims(ctx, file, file_path, *args, tmp_dir
             'com.oplus.process.pid': 'com.oplus.capture.request.idx',
             'com.oplus.TR.processing.state': 'com.oplus.capture.request.idx',
             'com.oplus.capture.request.idx_list': 'com.oplus.capture.request.idx',
+            'com.oplus.capture.request.picture.size.scale': 'com.oplus.capture.request.idx',
             'com.oplus.picture.offset.time': 'com.oplus.capture.request.idx',
             'com.oplus.izoom.ability.support': 'com.oplus.aps.zoom.feature',
             'com.oplus.mipiraw.online.bpc': 'com.oplus.capture.mipiraw.online.bpc',
@@ -5562,54 +5628,19 @@ def blob_fixup_camera_unit_sdk_runtime(ctx, file, file_path, *args, tmp_dir=None
         smali.write_text(fixed, encoding='utf-8')
 
 
-def blob_fixup_camera_oemlayer_snapshot_seamless_bad_metadata_guard(ctx, file, file_path, *args, tmp_dir=None, **kwargs):
-    data = Path(file_path).read_bytes()
-    snapshot_old = bytes.fromhex(
-        # ldr x8, [sp, #72]
-        'e82740f9'
-        # ldrh w8, [x8]
-        '08014079'
-        # tbnz w8, #3, +0x130
-        '88091837'
-    )
-    snapshot_new = bytes.fromhex(
-        # ldr x8, [sp, #72]
-        'e82740f9'
-        # mov w8, #8; force the existing tbnz to skip snapshot seamless metadata
-        '08018052'
-        # tbnz w8, #3, +0x130
-        '88091837'
-    )
-    if data.count(snapshot_old) == 1:
-        data = data.replace(snapshot_old, snapshot_new, 1)
-    elif data.count(snapshot_new) != 1:
-        raise ValueError('camera.oemlayer.v2.so snapshot seamless metadata guard pattern not found exactly once')
+def blob_fixup_camera_unit_facebeauty_probe_path(ctx, file, file_path, *args, tmp_dir=None, **kwargs):
+    # Re-point the guarded ProductJni probe from /product/lib64 to /system_ext/lib64.
+    if tmp_dir is None:
+        return
 
-    moonlayout_old = bytes.fromhex(
-        # ldur x8, [x29, #-56]
-        'a8835cf8'
-        # ldr w8, [x8, #980]
-        '08d543b9'
-        # subs w8, w8, #0
-        '08010071'
-        # cset w8, ne
-        'e8079f1a'
-    )
-    moonlayout_new = bytes.fromhex(
-        # ldur x8, [x29, #-56]
-        'a8835cf8'
-        # cbz x8, +0x200; skip moon-layout result metadata if GetRequestObject returned null
-        '081000b4'
-        # ldr w8, [x8, #980]
-        '08d543b9'
-        # cset w8, ne
-        'e8079f1a'
-    )
-    if data.count(moonlayout_old) == 1:
-        data = data.replace(moonlayout_old, moonlayout_new, 1)
-    elif data.count(moonlayout_new) != 1:
-        raise ValueError('camera.oemlayer.v2.so moon-layout null-guard pattern not found exactly once')
-    Path(file_path).write_bytes(data)
+    old = '/product/lib64/libApsFaceBeautyPreviewProductJni.so'
+    new = '/system_ext/lib64/libApsFaceBeautyPreviewProductJni.so'
+    for smali in Path(tmp_dir).glob('smali*/**/*.smali'):
+        data = smali.read_text(encoding='utf-8', errors='ignore')
+        if old not in data:
+            continue
+        smali.write_text(data.replace(old, new), encoding='utf-8')
+        return
 
 
 lib_fixups: lib_fixups_user_type = {
@@ -5627,29 +5658,81 @@ lib_fixups: lib_fixups_user_type = {
     ): lib_fixup_system_ext_suffix,
 }
 
+def blob_fixup_filemanager_cut_skip_k0_when_same_disk(ctx, file, file_path, *args, tmp_dir=None, **kwargs):
+    if tmp_dir is None:
+        return
+    smali = Path(tmp_dir) / 'smali' / 'com' / 'filemanager' / 'fileoperate' / 'cut' / 'FileActionCut.smali'
+    data = smali.read_text(encoding='utf-8')
+    # K0() checks whether a cross-device move dialog is needed, but on LineageOS
+    # it crashes silently (swallowed by the thread pool) before logging anything.
+    # V:Z is already set true in V() when source and dest are on the same volume,
+    # so skipping K0() for same-disk moves is correct — no cross-device dialog needed.
+    anchor = (
+        '    :cond_5d\n'
+        '    invoke-virtual {p0}, Lcom/filemanager/fileoperate/cut/FileActionCut;->K0()Z\n'
+    )
+    replacement = (
+        '    :cond_5d\n'
+        '    iget-boolean v2, p0, Lcom/filemanager/fileoperate/cut/FileActionCut;->V:Z\n'
+        '    if-nez v2, :cond_96\n'
+        '    invoke-virtual {p0}, Lcom/filemanager/fileoperate/cut/FileActionCut;->K0()Z\n'
+    )
+    if anchor not in data:
+        return
+    if replacement not in data:
+        data = data.replace(anchor, replacement, 1)
+    smali.write_text(data, encoding='utf-8')
+
+
+def blob_fixup_filemanager_select_dir_current_path_fallback(ctx, file, file_path, *args, tmp_dir=None, **kwargs):
+    if tmp_dir is None:
+        return
+    smali = Path(tmp_dir) / 'smali_classes3' / 'com' / 'oplus' / 'selectdir' / 'SelectDirPathPanelFragment.smali'
+    data = smali.read_text(encoding='utf-8')
+    log_anchor = '    const-string v4, "selectButton click -> select path:"\n'
+    button_anchor = '    iget-object p1, p0, Lcom/oplus/selectdir/SelectDirPathPanelFragment;->mSelectButton:Lcom/coui/appcompat/button/COUIButton;\n'
+    # B0().getValue() returns null because G0() never populates it in this flow.
+    # mPathBar.getCurrentPath() is updated on every navigation and is reliable.
+    new = (
+        '    iget-object v0, p0, Lcom/oplus/selectdir/SelectDirPathPanelFragment;->mPathBar:Lcom/filemanager/common/view/BrowserPathBar;\n'
+        '    if-eqz v0, :cond_pathbar_skip\n'
+        '    invoke-virtual {v0}, Lcom/filemanager/common/view/BrowserPathBar;->getCurrentPath()Ljava/lang/String;\n'
+        '    move-result-object v0\n'
+        '    if-eqz v0, :cond_pathbar_skip\n'
+        '    iget-object p1, v1, Lkotlin/jvm/internal/Ref$ObjectRef;->element:Ljava/lang/Object;\n'
+        '    check-cast p1, Ljava/util/List;\n'
+        '    if-eqz p1, :cond_pathbar_set\n'
+        '    invoke-interface {p1}, Ljava/util/List;->isEmpty()Z\n'
+        '    move-result p1\n'
+        '    if-eqz p1, :cond_pathbar_skip\n'
+        '    :cond_pathbar_set\n'
+        '    invoke-static {v0}, Lkotlin/collections/p;->e(Ljava/lang/Object;)Ljava/util/List;\n'
+        '    move-result-object v0\n'
+        '    iput-object v0, v1, Lkotlin/jvm/internal/Ref$ObjectRef;->element:Ljava/lang/Object;\n'
+        '    :cond_pathbar_skip\n'
+    )
+    log_idx = data.find(log_anchor)
+    button_idx = data.find(button_anchor, log_idx)
+    if log_idx == -1 or button_idx == -1:
+        return
+
+    select_path_block = data[log_idx:button_idx]
+    if ':cond_pathbar_skip' not in select_path_block:
+        data = data[:button_idx] + new + data[button_idx:]
+    smali.write_text(data, encoding='utf-8')
+
+
 blob_fixups: blob_fixups_user_type = {
-    'odm/lib64/hw/camera.oemlayer.v2.so': blob_fixup()
-        .call(blob_fixup_camera_oemlayer_snapshot_seamless_bad_metadata_guard),
     'system_ext/framework/com.oplus.camera.unit.sdk.jar': blob_fixup()
-        .call(blob_fixup_apktool_unpack_src)
-        .call(blob_fixup_camera_unit_op15_camera_type)
-        .call(blob_fixup_camera_unit_sdk_runtime)
-        .call(blob_fixup_oplus_camera_system_properties)
-        .call(blob_fixup_oplus_camera_framework_shims)
-        .apktool_pack()
-        .stripzip(),
-    'system_ext/framework/com.oplus.camera.unit.sdk.adapter.jar': blob_fixup()
-        .call(blob_fixup_apktool_unpack_src)
-        .call(blob_fixup_oplus_camera_framework_shims)
+        .apktool_unpack('patches-sdk')
+        .patch_dir('patches-sdk')
+        .call(blob_fixup_camera_unit_facebeauty_probe_path)
         .apktool_pack()
         .stripzip(),
     'system_ext/priv-app/OplusCamera/OplusCamera.apk': blob_fixup()
         .call(blob_fixup_apktool_unpack_full)
-        .call(blob_fixup_opluscamera_oppo_component_safe)
-        .call(blob_fixup_opluscamera_uses_library)
-        .call(blob_fixup_oplus_camera_system_properties)
-        .call(blob_fixup_oplus_camera_framework_shims)
-        .call(blob_fixup_opluscamera_defer_job_count)
+        .call(blob_fixup_opluscamera_font)
+        .call(blob_fixup_strip_oem_permissions)
         .apktool_pack()
         .stripzip(),
     'system_ext/app/AIUnit/AIUnit.apk': blob_fixup()
@@ -5679,6 +5762,7 @@ blob_fixups: blob_fixups_user_type = {
         .call(blob_fixup_oppogallery_google_photos_consent_on_verify_failure)
         .call(blob_fixup_oppogallery_google_photos_launch_consent_after_verify_failure)
         .call(blob_fixup_oppogallery_hide_google_photos_backup_settings)
+        .call(blob_fixup_strip_oem_permissions)
         .apktool_pack()
         .stripzip(),
     'system_ext/priv-app/StdID/StdID.apk': blob_fixup()
@@ -5716,6 +5800,8 @@ blob_fixups: blob_fixups_user_type = {
     'system_ext/app/FileManager/FileManager.apk': blob_fixup()
         .call(blob_fixup_apktool_unpack_full)
         .call(blob_fixup_opluscamera_uses_library)
+        .call(blob_fixup_filemanager_select_dir_current_path_fallback)
+        .call(blob_fixup_filemanager_cut_skip_k0_when_same_disk)
         .apktool_pack()
         .stripzip(),
     'system_ext/priv-app/UMS/UMS.apk': blob_fixup()
@@ -5783,36 +5869,31 @@ def write_custom_android_bp():
     ))
 
     android_bp = top / "vendor" / "oneplus" / "infiniti-camera" / "Android.bp"
-    android_bp.parent.mkdir(parents=True, exist_ok=True)
-
-    old_text = android_bp.read_text() if android_bp.exists() else ""
-
-    old_text = re.sub(
-        rf"\n?{re.escape(CUSTOM_SOONG_BEGIN)}.*?{re.escape(CUSTOM_SOONG_END)}\n?",
-        "\n",
-        old_text,
-        flags=re.S,
-    ).strip()
+    if not android_bp.exists():
+        return
 
     custom_block = f"""
 {CUSTOM_SOONG_BEGIN}
 
 dex_import {{
     name: "oplus-services",
-    owner: "oneplus/camera",
     jars: ["proprietary/system/framework/oplus-services.jar"],
-    visibility: ["//visibility:public"],
+    system_ext_specific: false,
 }}
 
 {CUSTOM_SOONG_END}
-""".strip()
+"""
 
-    new_text = old_text
-    if new_text:
-        new_text += "\n\n"
-    new_text += custom_block
-    new_text += "\n"
+    old_text = android_bp.read_text()
+    new_text = re.sub(
+        rf"\n?{re.escape(CUSTOM_SOONG_BEGIN)}.*?{re.escape(CUSTOM_SOONG_END)}\n?",
+        "",
+        old_text,
+        flags=re.S,
+    ).rstrip() + "\n" + custom_block
 
-    android_bp.write_text(new_text)
-    
+    if new_text != old_text:
+        android_bp.write_text(new_text)
+
+
 write_custom_android_bp()
