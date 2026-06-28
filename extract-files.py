@@ -418,6 +418,26 @@ def blob_fixup_phonemanager_settings_category(ctx, file, file_path, *args, tmp_d
         raise ValueError('PhoneManager Settings category metadata not found')
 
 
+def blob_fixup_phonemanager_permission_controller_package(ctx, file, file_path, *args, tmp_dir=None, **kwargs):
+    if tmp_dir is None:
+        return
+
+    old = 'com.google.android.permissioncontroller'
+    new = 'com.android.permissioncontroller'
+    replaced = False
+    for path in Path(tmp_dir).glob('**/*'):
+        if not path.is_file() or path.suffix not in {'.smali', '.xml'}:
+            continue
+        data = path.read_text(encoding='utf-8', errors='ignore')
+        if old not in data:
+            continue
+        path.write_text(data.replace(old, new), encoding='utf-8')
+        replaced = True
+
+    if not replaced:
+        raise ValueError('PhoneManager permission controller package string not found')
+
+
 def blob_fixup_cryptoeng_permissions_xml(ctx, file, file_path, *args, tmp_dir=None, **kwargs):
     path = Path(file_path)
     data = path.read_text(encoding='utf-8')
@@ -5805,6 +5825,7 @@ blob_fixups: blob_fixups_user_type = {
         .call(blob_fixup_opluscamera_uses_library)
         .call(blob_fixup_phonemanager_secure_settings_permission)
         .call(blob_fixup_phonemanager_settings_category)
+        .call(blob_fixup_phonemanager_permission_controller_package)
         .apktool_pack()
         .stripzip(),
     'system_ext/app/SafeCenter/SafeCenter.apk': blob_fixup()
