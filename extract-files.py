@@ -5667,20 +5667,28 @@ def blob_fixup_filemanager_cut_skip_k0_when_same_disk(ctx, file, file_path, *arg
     # it crashes silently (swallowed by the thread pool) before logging anything.
     # V:Z is already set true in V() when source and dest are on the same volume,
     # so skipping K0() for same-disk moves is correct — no cross-device dialog needed.
-    anchor = (
-        '    :cond_5d\n'
-        '    invoke-virtual {p0}, Lcom/filemanager/fileoperate/cut/FileActionCut;->K0()Z\n'
-    )
-    replacement = (
-        '    :cond_5d\n'
-        '    iget-boolean v2, p0, Lcom/filemanager/fileoperate/cut/FileActionCut;->V:Z\n'
-        '    if-nez v2, :cond_96\n'
-        '    invoke-virtual {p0}, Lcom/filemanager/fileoperate/cut/FileActionCut;->K0()Z\n'
-    )
-    if anchor not in data:
+    if 'iget-boolean v2, p0, Lcom/filemanager/fileoperate/cut/FileActionCut;->V:Z' in data:
         return
-    if replacement not in data:
-        data = data.replace(anchor, replacement, 1)
+    pattern = (
+        r'(?m)^(?P<label>    :cond_\w+\n)'
+        r'(?P<call>    invoke-virtual \{p0\}, Lcom/filemanager/fileoperate/cut/FileActionCut;->K0\(\)Z\n'
+        r'\n'
+        r'    move-result v2\n'
+        r'\n'
+        r'    if-eqz v2, :(?P<after>cond_\w+)\n)'
+    )
+
+    def skip_same_disk(match: re.Match) -> str:
+        return (
+            match.group('label')
+            + '    iget-boolean v2, p0, Lcom/filemanager/fileoperate/cut/FileActionCut;->V:Z\n'
+            + f'    if-nez v2, :{match.group("after")}\n'
+            + match.group('call')
+        )
+
+    data, count = re.subn(pattern, skip_same_disk, data, count=1)
+    if count != 1:
+        raise ValueError('FileManager FileActionCut K0() block not found exactly once')
     smali.write_text(data, encoding='utf-8')
 
 
@@ -5720,6 +5728,23 @@ def blob_fixup_filemanager_select_dir_current_path_fallback(ctx, file, file_path
     if ':cond_pathbar_skip' not in select_path_block:
         data = data[:button_idx] + new + data[button_idx:]
     smali.write_text(data, encoding='utf-8')
+
+
+def blob_fixup_filemanager_copycut_skip_osense_scene(ctx, file, file_path, *args, tmp_dir=None, **kwargs):
+    if tmp_dir is None:
+        return
+    smali = Path(tmp_dir) / 'smali' / 'com' / 'filemanager' / 'fileoperate' / 'copy' / 'FileActionBaseCopyCut.smali'
+    data = smali.read_text(encoding='utf-8')
+    signature = 'public final c0()V'
+    body = (
+        '    .locals 0\n'
+        '\n'
+        '    return-void\n'
+    )
+    fixed = _replace_smali_method(data, signature, body)
+    if fixed == data:
+        raise ValueError('FileManager FileActionBaseCopyCut.c0() method not found')
+    smali.write_text(fixed, encoding='utf-8')
 
 
 blob_fixups: blob_fixups_user_type = {
@@ -5802,6 +5827,7 @@ blob_fixups: blob_fixups_user_type = {
         .call(blob_fixup_opluscamera_uses_library)
         .call(blob_fixup_filemanager_select_dir_current_path_fallback)
         .call(blob_fixup_filemanager_cut_skip_k0_when_same_disk)
+        .call(blob_fixup_filemanager_copycut_skip_osense_scene)
         .apktool_pack()
         .stripzip(),
     'system_ext/priv-app/UMS/UMS.apk': blob_fixup()
