@@ -370,10 +370,105 @@ def blob_fixup_fileencryption_secure_settings_permission(ctx, file, file_path, *
 
     manifest = Path(tmp_dir) / 'AndroidManifest.xml'
     data = manifest.read_text(encoding='utf-8') if manifest.exists() else ''
-    permission = '    <uses-permission android:name="android.permission.WRITE_SECURE_SETTINGS"/>\n'
-    if data and 'android.permission.WRITE_SECURE_SETTINGS' not in data:
-        data = data.replace('<application ', permission + '    <application ', 1)
+    permissions = (
+        'android.permission.USE_BIOMETRIC',
+        'android.permission.USE_FINGERPRINT',
+        'android.permission.WRITE_SECURE_SETTINGS',
+    )
+    entries = ''.join(
+        f'    <uses-permission android:name="{permission}"/>\n'
+        for permission in permissions
+        if permission not in data
+    )
+    if data and entries:
+        data = data.replace('<application ', entries + '    <application ', 1)
         manifest.write_text(data, encoding='utf-8')
+
+
+def blob_fixup_fileencryption_biometric_enrollment_checks(ctx, file, file_path, *args, tmp_dir=None, **kwargs):
+    if tmp_dir is None:
+        return
+
+    smali = Path(tmp_dir) / 'smali/c9/a.smali'
+    data = smali.read_text(encoding='utf-8') if smali.exists() else ''
+    if not data:
+        raise ValueError('FileEncryption biometric helper not found')
+
+    face_body = (
+        '    .locals 2\n'
+        '\n'
+        '    :try_start_0\n'
+        '    const-string v0, "face"\n'
+        '\n'
+        '    invoke-virtual {p0, v0}, Landroid/content/Context;->getSystemService(Ljava/lang/String;)Ljava/lang/Object;\n'
+        '\n'
+        '    move-result-object p0\n'
+        '\n'
+        '    instance-of v0, p0, Landroid/hardware/face/FaceManager;\n'
+        '\n'
+        '    if-eqz v0, :cond_0\n'
+        '\n'
+        '    check-cast p0, Landroid/hardware/face/FaceManager;\n'
+        '\n'
+        '    invoke-virtual {p0}, Landroid/hardware/face/FaceManager;->hasEnrolledTemplates()Z\n'
+        '\n'
+        '    move-result p0\n'
+        '\n'
+        '    return p0\n'
+        '    :try_end_0\n'
+        '    .catch Ljava/lang/Throwable; {:try_start_0 .. :try_end_0} :catch_0\n'
+        '\n'
+        '    :catch_0\n'
+        '    move-exception p0\n'
+        '\n'
+        '    :cond_0\n'
+        '    const/4 p0, 0x0\n'
+        '\n'
+        '    return p0\n'
+    )
+    fingerprint_body = (
+        '    .locals 2\n'
+        '\n'
+        '    :try_start_0\n'
+        '    const-string v0, "fingerprint"\n'
+        '\n'
+        '    invoke-virtual {p0, v0}, Landroid/content/Context;->getSystemService(Ljava/lang/String;)Ljava/lang/Object;\n'
+        '\n'
+        '    move-result-object p0\n'
+        '\n'
+        '    instance-of v0, p0, Landroid/hardware/fingerprint/FingerprintManager;\n'
+        '\n'
+        '    if-eqz v0, :cond_0\n'
+        '\n'
+        '    check-cast p0, Landroid/hardware/fingerprint/FingerprintManager;\n'
+        '\n'
+        '    invoke-virtual {p0}, Landroid/hardware/fingerprint/FingerprintManager;->isHardwareDetected()Z\n'
+        '\n'
+        '    move-result v0\n'
+        '\n'
+        '    if-eqz v0, :cond_0\n'
+        '\n'
+        '    invoke-virtual {p0}, Landroid/hardware/fingerprint/FingerprintManager;->hasEnrolledFingerprints()Z\n'
+        '\n'
+        '    move-result p0\n'
+        '\n'
+        '    return p0\n'
+        '    :try_end_0\n'
+        '    .catch Ljava/lang/Throwable; {:try_start_0 .. :try_end_0} :catch_0\n'
+        '\n'
+        '    :catch_0\n'
+        '    move-exception p0\n'
+        '\n'
+        '    :cond_0\n'
+        '    const/4 p0, 0x0\n'
+        '\n'
+        '    return p0\n'
+    )
+    fixed = _replace_smali_method(data, 'public static final b(Landroid/content/Context;)Z', face_body)
+    fixed = _replace_smali_method(fixed, 'public static final c(Landroid/content/Context;)Z', fingerprint_body)
+    if fixed == data:
+        raise ValueError('FileEncryption biometric enrollment checks not patched')
+    smali.write_text(fixed, encoding='utf-8')
 
 
 def blob_fixup_phonemanager_secure_settings_permission(ctx, file, file_path, *args, tmp_dir=None, **kwargs):
@@ -5871,6 +5966,7 @@ blob_fixups: blob_fixups_user_type = {
         .call(blob_fixup_apktool_unpack_full)
         .call(blob_fixup_opluscamera_uses_library)
         .call(blob_fixup_fileencryption_secure_settings_permission)
+        .call(blob_fixup_fileencryption_biometric_enrollment_checks)
         .call(blob_fixup_oplus_camera_system_properties)
         .apktool_pack()
         .stripzip(),
