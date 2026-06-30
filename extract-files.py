@@ -1397,6 +1397,58 @@ def blob_fixup_oppogallery_op15_native_libs(ctx, file, file_path, *args, tmp_dir
         shutil.copy2(source_dir / lib, lib_dir / lib)
 
 
+def blob_fixup_oppogallery_enable_olive_config(ctx, file, file_path, *args, tmp_dir=None, **kwargs):
+    if tmp_dir is None:
+        return
+
+    # On non-OPlus ROM config initialization can miss device feature toggles.
+    # Keep the override narrow: enable only Gallery's OLive playback gates.
+    for smali in Path(tmp_dir).glob('smali*/com/oplus/aiunit/vision/c25.smali'):
+        data = smali.read_text(encoding='utf-8')
+        signature = 'public static final c(Ljava/lang/String;ZZ)Z'
+        method_match = re.search(
+            rf'(?ms)^\.method {re.escape(signature)}\n.*?^\.end method',
+            data,
+        )
+        if method_match is None:
+            raise ValueError('OppoGallery2 config wrapper boolean method not found')
+        method = method_match.group(0)
+        header_match = re.search(r'(?m)^    \.locals \d+\n', method)
+        if header_match is None:
+            raise ValueError('OppoGallery2 config wrapper method header not found')
+        inject = header_match.group(0) + (
+            '    const-string v0, "feature_is_support_olive"\n'
+            '\n'
+            '    invoke-virtual {v0, p0}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z\n'
+            '\n'
+            '    move-result v0\n'
+            '\n'
+            '    if-nez v0, :cond_op15_olive_enabled\n'
+            '\n'
+            '    const-string v0, "feature_is_support_olive_slide_play"\n'
+            '\n'
+            '    invoke-virtual {v0, p0}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z\n'
+            '\n'
+            '    move-result v0\n'
+            '\n'
+            '    if-nez v0, :cond_op15_olive_enabled\n'
+            '\n'
+        )
+        fixed_method = method[:header_match.start()] + inject + method[header_match.end():]
+        return_block = (
+            '\n'
+            '    :cond_op15_olive_enabled\n'
+            '    const/4 p0, 0x1\n'
+            '\n'
+            '    return p0\n'
+        )
+        fixed_method = fixed_method[:-len('.end method')] + return_block + '.end method'
+        smali.write_text(data[:method_match.start()] + fixed_method + data[method_match.end():], encoding='utf-8')
+        return
+
+    raise ValueError('OppoGallery2 config wrapper smali not found')
+
+
 def blob_fixup_oppogallery_popup_enter(ctx, file, file_path, *args, tmp_dir=None, **kwargs):
     if tmp_dir is None:
         return
@@ -5896,6 +5948,7 @@ blob_fixups: blob_fixups_user_type = {
         .call(blob_fixup_apktool_unpack_full)
         .call(blob_fixup_opluscamera_uses_library)
         .call(blob_fixup_oppogallery_op15_native_libs)
+        .call(blob_fixup_oppogallery_enable_olive_config)
         .call(blob_fixup_oppogallery_receiver_flags)
         .call(blob_fixup_oppogallery_wallpaper_attach_intent)
         .call(blob_fixup_oppogallery_safe_box_custom_flag)
