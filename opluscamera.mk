@@ -80,7 +80,6 @@ PRODUCT_PRODUCT_PROPERTIES += \
     ro.vendor.oplus.vendorxml.enable=1 \
     vendor.oplus.hdr.uniform.debug=1 \
     oplus.software.camera.10bit=1 \
-    vendor.camera.aux.packagelist=* \
     ro.camera.notify_nfc=1 \
     ro.oplus.camera.facing.front.need.disable.nfc=1 \
     ro.oplus.camera.portrait.center.switch=oplus.switch.portrait.center \
