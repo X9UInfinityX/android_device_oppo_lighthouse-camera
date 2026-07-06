@@ -49,6 +49,7 @@ my_product/lib64/libjni_burstpmk.so:system_ext/lib64/libjni_burstpmk.so;DISABLE_
 my_product/lib64/libjni_wideselfie.so:system_ext/lib64/libjni_wideselfie.so;DISABLE_CHECKELF
 my_product/lib64/libjnisingleblur_api.so:system_ext/lib64/libjnisingleblur_api.so;FIX_SONAME;DISABLE_CHECKELF
 my_product/lib64/libjnistblur_api.so:system_ext/lib64/libjnistblur_api.so;FIX_SONAME;DISABLE_CHECKELF
+my_product/lib64/libjnistblur_api.so:odm/lib64/libstblur_api.so;DISABLE_CHECKELF
 my_product/lib64/libmpbase.so:system_ext/lib64/libmpbase.so;MODULE_SUFFIX=_system_ext;DISABLE_CHECKELF
 my_product/lib64/libdolbyeffect_4.1.so:system_ext/lib64/libdolbyeffect_4.1.so;DISABLE_CHECKELF
 my_product/lib64/liboplusdolbyeffect_4.1.so:system_ext/lib64/liboplusdolbyeffect_4.1.so;DISABLE_CHECKELF
