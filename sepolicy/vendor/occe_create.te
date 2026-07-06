@@ -7,3 +7,9 @@ allow occe_create gpu_device:chr_file rw_file_perms;
 allow occe_create same_process_hal_file:file { read open getattr execute map };
 
 dontaudit occe_create servicemanager:binder call;
+
+get_prop(occe_create, vendor_camera_prop)
+get_prop(occe_create, graphics_config_prop)
+get_prop(occe_create, graphics_config_writable_prop)
+
+dontaudit occe_create default_prop:file r_file_perms;
