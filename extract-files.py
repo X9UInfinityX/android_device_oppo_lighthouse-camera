@@ -5977,6 +5977,98 @@ def blob_fixup_filemanager_copycut_skip_osense_scene(ctx, file, file_path, *args
     smali.write_text(fixed, encoding='utf-8')
 
 
+def blob_fixup_filemanager_skip_osense_scene_actions(ctx, file, file_path, *args, tmp_dir=None, **kwargs):
+    if tmp_dir is None:
+        return
+    smali = Path(tmp_dir) / 'smali' / 'u6' / 'b.smali'
+    data = smali.read_text(encoding='utf-8')
+    signature = 'public static final f(Ljava/lang/String;I)V'
+    body = (
+        '    .locals 2\n'
+        '\n'
+        '    const-string p1, "action"\n'
+        '\n'
+        '    invoke-static {p0, p1}, Lkotlin/jvm/internal/j;->g(Ljava/lang/Object;Ljava/lang/String;)V\n'
+        '\n'
+        '    const-string p0, "PerformanceManager"\n'
+        '\n'
+        '    const-string p1, "setSceneAction return, patched"\n'
+        '\n'
+        '    invoke-static {p0, p1}, Lcom/filemanager/common/utils/g2;->b(Ljava/lang/String;Ljava/lang/String;)V\n'
+        '\n'
+        '    return-void\n'
+    )
+    fixed = _replace_smali_method(data, signature, body)
+    if fixed == data:
+        raise ValueError('FileManager PerformanceManager.f() method not found')
+    smali.write_text(fixed, encoding='utf-8')
+
+
+def blob_fixup_filemanager_safecheck_direct(ctx, file, file_path, *args, tmp_dir=None, **kwargs):
+    if tmp_dir is None:
+        return
+    smali = Path(tmp_dir) / 'smali' / 'com' / 'filemanager' / 'common' / 'fileutils' / 'e.smali'
+    data = smali.read_text(encoding='utf-8')
+    signature = 'public final x(Lvt/a;Ljava/lang/Object;)Ljava/lang/Object;'
+    body = (
+        '    .locals 3\n'
+        '\n'
+        '    const-string p0, "method"\n'
+        '\n'
+        '    invoke-static {p1, p0}, Lkotlin/jvm/internal/j;->g(Ljava/lang/Object;Ljava/lang/String;)V\n'
+        '\n'
+        '    const-string p0, "safeCheck direct"\n'
+        '\n'
+        '    const-string v0, "JavaFileHelper"\n'
+        '\n'
+        '    invoke-static {v0, p0}, Lcom/filemanager/common/utils/g2;->b(Ljava/lang/String;Ljava/lang/String;)V\n'
+        '\n'
+        '    :try_start_0\n'
+        '    invoke-interface {p1}, Lvt/a;->invoke()Ljava/lang/Object;\n'
+        '\n'
+        '    move-result-object p0\n'
+        '    :try_end_0\n'
+        '    .catch Ljava/lang/Throwable; {:try_start_0 .. :try_end_0} :catch_0\n'
+        '\n'
+        '    return-object p0\n'
+        '\n'
+        '    :catch_0\n'
+        '    move-exception p0\n'
+        '\n'
+        '    invoke-virtual {p0}, Ljava/lang/Throwable;->getMessage()Ljava/lang/String;\n'
+        '\n'
+        '    move-result-object p0\n'
+        '\n'
+        '    new-instance p1, Ljava/lang/StringBuilder;\n'
+        '\n'
+        '    invoke-direct {p1}, Ljava/lang/StringBuilder;-><init>()V\n'
+        '\n'
+        '    const-string v1, "safeCheck failed: default="\n'
+        '\n'
+        '    invoke-virtual {p1, v1}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;\n'
+        '\n'
+        '    invoke-virtual {p1, p2}, Ljava/lang/StringBuilder;->append(Ljava/lang/Object;)Ljava/lang/StringBuilder;\n'
+        '\n'
+        '    const-string v1, ", "\n'
+        '\n'
+        '    invoke-virtual {p1, v1}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;\n'
+        '\n'
+        '    invoke-virtual {p1, p0}, Ljava/lang/StringBuilder;->append(Ljava/lang/String;)Ljava/lang/StringBuilder;\n'
+        '\n'
+        '    invoke-virtual {p1}, Ljava/lang/StringBuilder;->toString()Ljava/lang/String;\n'
+        '\n'
+        '    move-result-object p0\n'
+        '\n'
+        '    invoke-static {v0, p0}, Lcom/filemanager/common/utils/g2;->b(Ljava/lang/String;Ljava/lang/String;)V\n'
+        '\n'
+        '    return-object p2\n'
+    )
+    fixed = _replace_smali_method(data, signature, body)
+    if fixed == data:
+        raise ValueError('FileManager JavaFileHelper.safeCheck method not found')
+    smali.write_text(fixed, encoding='utf-8')
+
+
 blob_fixups: blob_fixups_user_type = {
     'system_ext/framework/com.oplus.camera.unit.sdk.jar': blob_fixup()
         .apktool_unpack('patches-sdk')
@@ -6058,9 +6150,11 @@ blob_fixups: blob_fixups_user_type = {
     'system_ext/app/FileManager/FileManager.apk': blob_fixup()
         .call(blob_fixup_apktool_unpack_full)
         .call(blob_fixup_opluscamera_uses_library)
+        .call(blob_fixup_filemanager_safecheck_direct)
         .call(blob_fixup_filemanager_select_dir_current_path_fallback)
         .call(blob_fixup_filemanager_cut_skip_k0_when_same_disk)
         .call(blob_fixup_filemanager_copycut_skip_osense_scene)
+        .call(blob_fixup_filemanager_skip_osense_scene_actions)
         .apktool_pack()
         .stripzip(),
     'system_ext/priv-app/UMS/UMS.apk': blob_fixup()
