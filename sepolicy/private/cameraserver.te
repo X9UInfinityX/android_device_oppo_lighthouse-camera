@@ -1,2 +1,9 @@
 allow cameraserver data_system_camera_rus:dir { read open search };
 allow cameraserver data_system_camera_rus:file { read getattr setattr open };
+dontaudit cameraserver vendor_default_prop:file { getattr map open read };
+
+# Oplus camera asks cameraserver to boost the client process during capture.
+# The target process has app MCS categories, so the process setsched MLS rule
+# also requires cameraserver to be trusted for this access.
+typeattribute cameraserver mlstrustedsubject;
+allow cameraserver opluscamera_app:process setsched;

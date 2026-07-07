@@ -1,12 +1,17 @@
 app_domain(opluscamera_app)
 net_domain(opluscamera_app)
 hal_client_domain(opluscamera_app, vendor_hal_dspmanager)
+hal_client_domain(opluscamera_app, vendor_hal_qspmhal)
 
 allow opluscamera_app adsprpcd_file:dir r_dir_perms;
 allow opluscamera_app public_adsprpcd_file:file r_file_perms;
 allow opluscamera_app same_process_hal_file:file r_file_perms;
 
-allow opluscamera_app vendor_data_file:dir  { read open search write add_name remove_name create getattr };
+# Camera live bokeh reads OCCE shader/cache files generated under /mnt/occe.
+allow opluscamera_app occe_data_file:dir r_dir_perms;
+allow opluscamera_app occe_data_file:file r_file_perms;
+
+allow opluscamera_app vendor_data_file:dir  { read open search write add_name remove_name create getattr rename reparent rmdir setattr };
 allow opluscamera_app vendor_data_file:file { read open write create unlink getattr rename };
 allow opluscamera_app vendor_camera_update_data_file:file { read open write create unlink getattr };
 allow opluscamera_app vendor_camera_update_data_file:dir { read open search write add_name remove_name create getattr };
@@ -22,9 +27,15 @@ allow opluscamera_app opluscamera_app_data_file:dir { read open search write add
 # vendor_qdsp_device: read-only only — neverallow on SM8750 blocks write/append
 # for non-HAL domains. The camera app only needs to open/read/ioctl for DSP
 # session setup; actual writes go through the HAL.
-allow opluscamera_app vendor_qdsp_device:chr_file { ioctl read };
-dontaudit opluscamera_app vendor_qdsp_device:chr_file open;
+allow opluscamera_app vendor_qdsp_device:chr_file { ioctl open read };
 dontaudit opluscamera_app vendor_xdsp_device:chr_file { getattr ioctl open read write create unlink };
+
+# Text/OCR and night capture paths traverse /data/vendor/camera for OEM state.
+allow opluscamera_app vendor_camera_data_file:dir { add_name create getattr open read remove_name rmdir search write };
+allow opluscamera_app vendor_camera_data_file:file { create getattr open read rename unlink write };
+
+# Preview document probing traverses /data/local/tmp while preparing capture.
+allow opluscamera_app shell_data_file:dir search;
 
 # selinuxfs
 allow opluscamera_app selinuxfs:file { read open };
@@ -53,12 +64,6 @@ allow opluscamera_app package_native_service:service_manager find;
 allow opluscamera_app permission_service:service_manager find;
 allow opluscamera_app vendor_hal_offlinecamera_service:service_manager find;
 allow opluscamera_app hal_system_suspend_service:service_manager find;
-dontaudit opluscamera_app vendor_hal_qspmhal_service:service_manager find;
-
-
-# Allow binder communication with QSPM HAL
-allow opluscamera_app vendor_hal_qspmhal_default:binder { call transfer };
-
 
 # Offline camera post-processing service is protected by hal_camera policy.
 # Do not mark this app as a hal_camera client; that trips appdomain neverallows.

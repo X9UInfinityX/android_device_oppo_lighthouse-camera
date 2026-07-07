@@ -1,3 +1,7 @@
 allow init adsprpcd_file:file mounton;
 
 set_prop(vendor_init, vendor_camera_prop)
+
+# /odm/etc/init/occe_create.rc creates /mnt/occe during post-fs-data.
+allow vendor_init tmpfs:dir create_dir_perms;
+allow vendor_init occe_data_file:dir create_dir_perms;
