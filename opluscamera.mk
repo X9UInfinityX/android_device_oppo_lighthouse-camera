@@ -3,6 +3,7 @@ OPLUS_CAMERA_PATH := device/oneplus/infiniti-camera
 
 # Blob dependencies
 PRODUCT_PACKAGES += \
+    aon.frameworkres.overlay.product \
     android.hardware.graphics.common-V3-ndk.vendor \
     oplus-services \
     Photos
@@ -22,6 +23,7 @@ PRODUCT_SYSTEM_SERVER_JARS += \
 PRODUCT_COPY_FILES += \
     $(OPLUS_CAMERA_PATH)/configs/init/init.oplus.camera_rus.rc:$(TARGET_COPY_OUT_SYSTEM_EXT)/etc/init/init.oplus.camera_rus.rc \
     $(OPLUS_CAMERA_PATH)/configs/extension/com.oplus.app-features.xml:$(TARGET_COPY_OUT_SYSTEM_EXT)/etc/extension/com.oplus.app-features.xml \
+    $(OPLUS_CAMERA_PATH)/configs/permissions/default-permissions-com.aiunit.aon.xml:$(TARGET_COPY_OUT_PRODUCT)/etc/default-permissions/default-permissions-com.aiunit.aon.xml \
     $(OPLUS_CAMERA_PATH)/configs/permissions/com.oplus.android-features.xml:$(TARGET_COPY_OUT_SYSTEM_EXT)/etc/permissions/com.oplus.android-features.xml \
     $(OPLUS_CAMERA_PATH)/configs/permissions/com.oplus.pantanal.ums.privapp_permissions.xml:$(TARGET_COPY_OUT_SYSTEM_EXT)/etc/permissions/com.oplus.pantanal.ums.privapp_permissions.xml \
     $(OPLUS_CAMERA_PATH)/configs/permissions/oplus_google_lens_config.xml:$(TARGET_COPY_OUT_SYSTEM_EXT)/etc/permissions/oplus_google_lens_config.xml \
