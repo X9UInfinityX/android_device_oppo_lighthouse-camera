@@ -702,6 +702,35 @@ def blob_fixup_safecenter_olock_support(ctx, file, file_path, *args, tmp_dir=Non
         raise ValueError('SafeCenter OLock support patch point not found')
 
 
+def blob_fixup_safecenter_olock_theft_dark_theme(ctx, file, file_path, *args, tmp_dir=None, **kwargs):
+    if tmp_dir is None:
+        return
+
+    values_night = Path(tmp_dir) / 'res/values-night/styles.xml'
+    data = values_night.read_text(encoding='utf-8') if values_night.exists() else ''
+    style = (
+        '    <style name="AppTheme.OlockSettingTheme" parent="@style/Theme.COUI.Dark">\n'
+        '        <item name="android:windowBackground">?couiColorBackgroundWithCard</item>\n'
+        '        <item name="android:statusBarColor">?couiColorBackgroundWithCard</item>\n'
+        '        <item name="android:navigationBarColor">?couiColorBackgroundWithCard</item>\n'
+        '        <item name="android:isLightTheme">false</item>\n'
+        '        <item name="android:windowDisablePreview">true</item>\n'
+        '        <item name="enableFollowSystemForceDarkRank">true</item>\n'
+        '        <item name="preferenceTheme">@style/PreferenceThemeOverlay.COUITheme</item>\n'
+        '        <item name="viewInflaterClass">@string/coui_view_inflater_class</item>\n'
+        '        <item name="windowActionBar">false</item>\n'
+        '        <item name="windowNoTitle">true</item>\n'
+        '        <item name="windowPreviewType">0</item>\n'
+        '    </style>\n'
+    )
+    if 'name="AppTheme.OlockSettingTheme"' not in data:
+        fixed = data.replace('    <style name="Theme.AppCompat.DayNight"', style + '    <style name="Theme.AppCompat.DayNight"', 1)
+        if fixed == data:
+            raise ValueError('SafeCenter OLock night theme patch point not found')
+        values_night.write_text(fixed, encoding='utf-8')
+
+
+
 def blob_fixup_securitypermission_safe_permissions(ctx, file, file_path, *args, tmp_dir=None, **kwargs):
     if tmp_dir is None:
         return
@@ -6137,6 +6166,7 @@ blob_fixups: blob_fixups_user_type = {
         .call(blob_fixup_opluscamera_uses_library)
         .call(blob_fixup_safecenter_receiver_flags)
         .call(blob_fixup_safecenter_olock_support)
+        .call(blob_fixup_safecenter_olock_theft_dark_theme)
         .apktool_pack()
         .stripzip(),
     'system_ext/etc/permissions/vendor-oplus-hardware-cryptoeng.xml': blob_fixup()
