@@ -235,16 +235,16 @@ system_ext/lib64/libHeifWinBufExchg-jni.so;DISABLE_CHECKELF
 system_ext/lib64/libNativeWinBuffExchange.so
 system_ext/lib64/liboplusgui_jni.so;DISABLE_CHECKELF
 system_ext/lib64/liboplusheifwriter.so
-my_stock/priv-app/AIUnit/AIUnit.apk:system_ext/priv-app/AIUnit/AIUnit.apk
-my_stock/priv-app/AIUnit/lib/arm64/libc++.so:system_ext/lib64/libc++.so;MODULE_SUFFIX=_aiunit;DISABLE_DEPS;SYMLINK=system_ext/priv-app/AIUnit/lib/arm64/libc++.so
-my_stock/priv-app/AIUnit/lib/arm64/libc++_shared.so:system_ext/lib64/libc++_shared.so;MODULE_SUFFIX=_aiunit;DISABLE_DEPS;SYMLINK=system_ext/priv-app/AIUnit/lib/arm64/libc++_shared.so
-my_stock/priv-app/AIUnit/lib/arm64/libaiunit_framework_jni.so:system_ext/lib64/libaiunit_framework_jni.so;MODULE_SUFFIX=_aiunit;DISABLE_DEPS;SYMLINK=system_ext/priv-app/AIUnit/lib/arm64/libaiunit_framework_jni.so
-my_stock/priv-app/AIUnit/lib/arm64/libaiunit_framework.so:system_ext/lib64/libaiunit_framework.so;MODULE_SUFFIX=_aiunit;DISABLE_DEPS;SYMLINK=system_ext/priv-app/AIUnit/lib/arm64/libaiunit_framework.so
-my_stock/priv-app/AIUnit/lib/arm64/libaiunit_sdk_core.so:system_ext/lib64/libaiunit_sdk_core.so;MODULE_SUFFIX=_aiunit;DISABLE_DEPS;SYMLINK=system_ext/priv-app/AIUnit/lib/arm64/libaiunit_sdk_core.so
-my_stock/priv-app/AIUnit/lib/arm64/libcore_tokenizers.so:system_ext/lib64/libcore_tokenizers.so;MODULE_SUFFIX=_aiunit;DISABLE_DEPS;SYMLINK=system_ext/priv-app/AIUnit/lib/arm64/libcore_tokenizers.so
-my_stock/priv-app/AIUnit/lib/arm64/libdatastore_shared_counter.so:system_ext/lib64/libdatastore_shared_counter.so;MODULE_SUFFIX=_aiunit;DISABLE_DEPS;SYMLINK=system_ext/priv-app/AIUnit/lib/arm64/libdatastore_shared_counter.so
-my_stock/priv-app/AIUnit/lib/arm64/libdmabufheap.so:system_ext/lib64/libdmabufheap.so;MODULE_SUFFIX=_aiunit;DISABLE_DEPS;SYMLINK=system_ext/priv-app/AIUnit/lib/arm64/libdmabufheap.so
-my_stock/priv-app/AIUnit/lib/arm64/libopencv_java4.so:system_ext/lib64/libopencv_java4.so;MODULE_SUFFIX=_aiunit;DISABLE_DEPS;SYMLINK=system_ext/priv-app/AIUnit/lib/arm64/libopencv_java4.so
+my_stock/priv-app/AIUnit/AIUnit.apk:product/priv-app/AIUnit/AIUnit.apk
+my_stock/priv-app/AIUnit/lib/arm64/libc++.so:product/lib64/libc++.so;MODULE_SUFFIX=_aiunit;DISABLE_DEPS;SYMLINK=product/priv-app/AIUnit/lib/arm64/libc++.so
+my_stock/priv-app/AIUnit/lib/arm64/libc++_shared.so:product/lib64/libc++_shared.so;MODULE_SUFFIX=_aiunit;DISABLE_DEPS;SYMLINK=product/priv-app/AIUnit/lib/arm64/libc++_shared.so
+my_stock/priv-app/AIUnit/lib/arm64/libaiunit_framework_jni.so:product/lib64/libaiunit_framework_jni.so;MODULE_SUFFIX=_aiunit;DISABLE_DEPS;SYMLINK=product/priv-app/AIUnit/lib/arm64/libaiunit_framework_jni.so
+my_stock/priv-app/AIUnit/lib/arm64/libaiunit_framework.so:product/lib64/libaiunit_framework.so;MODULE_SUFFIX=_aiunit;DISABLE_DEPS;SYMLINK=product/priv-app/AIUnit/lib/arm64/libaiunit_framework.so
+my_stock/priv-app/AIUnit/lib/arm64/libaiunit_sdk_core.so:product/lib64/libaiunit_sdk_core.so;MODULE_SUFFIX=_aiunit;DISABLE_DEPS;SYMLINK=product/priv-app/AIUnit/lib/arm64/libaiunit_sdk_core.so
+my_stock/priv-app/AIUnit/lib/arm64/libcore_tokenizers.so:product/lib64/libcore_tokenizers.so;MODULE_SUFFIX=_aiunit;DISABLE_DEPS;SYMLINK=product/priv-app/AIUnit/lib/arm64/libcore_tokenizers.so
+my_stock/priv-app/AIUnit/lib/arm64/libdatastore_shared_counter.so:product/lib64/libdatastore_shared_counter.so;MODULE_SUFFIX=_aiunit;DISABLE_DEPS;SYMLINK=product/priv-app/AIUnit/lib/arm64/libdatastore_shared_counter.so
+my_stock/priv-app/AIUnit/lib/arm64/libdmabufheap.so:product/lib64/libdmabufheap.so;MODULE_SUFFIX=_aiunit;DISABLE_DEPS;SYMLINK=product/priv-app/AIUnit/lib/arm64/libdmabufheap.so
+my_stock/priv-app/AIUnit/lib/arm64/libopencv_java4.so:product/lib64/libopencv_java4.so;MODULE_SUFFIX=_aiunit;DISABLE_DEPS;SYMLINK=product/priv-app/AIUnit/lib/arm64/libopencv_java4.so
 my_stock/app/AIMemory/AIMemory.apk:product/priv-app/AIMemory/AIMemory.apk;PRESIGNED
 my_stock/app/AIMemory/lib/arm64/libaiunit_sdk_core.so:product/lib64/libaiunit_sdk_core.so;MODULE_SUFFIX=_aimemory;DISABLE_DEPS;SYMLINK=product/priv-app/AIMemory/lib/arm64/libaiunit_sdk_core.so
 my_stock/app/AIMemory/lib/arm64/libnoise.so:product/lib64/libnoise.so;MODULE_SUFFIX=_aimemory;DISABLE_DEPS;SYMLINK=product/priv-app/AIMemory/lib/arm64/libnoise.so
@@ -307,7 +307,7 @@ odm/lib64/vendor.oplus.hardware.fido.fidoca-V1-ndk.so;DISABLE_DEPS
 odm/lib64/vendor.oplus.hardware.fido.fido2ca-V1-ndk.so;DISABLE_DEPS
 odm/lib64/vendor.oplus.hardware.cryptoeng-V1-ndk.so;MODULE_SUFFIX=_odm;DISABLE_DEPS
 odm/lib64/vendor.oplus.hardware.cryptoeng@1.0.so;MODULE_SUFFIX=_odm;DISABLE_DEPS
-my_stock/app/RomUpdate/RomUpdate.apk:system_ext/app/RomUpdate/RomUpdate.apk
+my_stock/app/RomUpdate/RomUpdate.apk:product/app/RomUpdate/RomUpdate.apk
 my_stock/priv-app/PhoneManager/PhoneManager.apk:system_ext/priv-app/PhoneManager/PhoneManager.apk
 system_ext/priv-app/OplusAppPlatform/OplusAppPlatform.apk
 
