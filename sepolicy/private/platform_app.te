@@ -18,3 +18,7 @@ allow platform_app selinuxfs:file { getattr open read };
 allow platform_app oplus_accesscontrol_service:service_manager find;
 allow platform_app security_permission_service:service_manager find;
 set_prop(platform_app, oplus_systemclearservice_prop)
+
+# Gallery/editor stock code checks Oplus touch/display properties and loads the
+# remapped stock libutils shim while setting up AI editor/HDR pipelines.
+get_prop(platform_app, system_oplus_touch_prop)
