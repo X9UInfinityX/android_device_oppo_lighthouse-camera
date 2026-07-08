@@ -104,8 +104,7 @@ PRODUCT_PRODUCT_PROPERTIES += \
 PRODUCT_VENDOR_PROPERTIES += \
     ro.camera.enableCamera1MaxZsl=1 \
     ro.vendor.oplus.camera.backCamSize=50MP+50MP+50MP \
-    ro.vendor.oplus.camera.frontCamSize=32MP \
-    ro.vendor.oplus.regionmark=ROW
+    ro.vendor.oplus.camera.frontCamSize=32MP
 
 PRODUCT_SYSTEM_EXT_PROPERTIES += \
     ro.build.version.oplus.api=38 \
