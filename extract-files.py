@@ -21,6 +21,7 @@ from extract_utils.main import (
 )
 from extract_utils.utils import run_cmd
 from pathlib import Path
+import glob
 import re
 import shutil
 
@@ -1038,54 +1039,104 @@ def blob_fixup_oppogallery_hide_google_photos_backup_settings(ctx, file, file_pa
     if tmp_dir is None:
         return
 
-    smali = Path(tmp_dir) / 'smali_classes10/com/oplus/gallery/settingpage/SettingsActivity$SettingFragment.smali'
-    if not smali.exists():
-        return
+    # Hide the photo-page overflow entry on newer Gallery builds. The older
+    # settings-only patch below does not catch this 16.0.8 menu path.
+    smali = Path(tmp_dir) / 'smali_classes10/com/oplus/aiunit/vision/g0i.smali'
+    if smali.exists():
+        data = smali.read_text(encoding='utf-8')
+        marker = (
+            '    sget v1, Lcom/oplus/gallery/photo_page/R$id;->action_backup_to_cloud:I\n'
+            '\n'
+            '    .line 532\n'
+            '    .line 533\n'
+            '    const-wide/high16 v3, 0x4000000000000000L    # 2.0\n'
+            '\n'
+            '    .line 534\n'
+            '    .line 535\n'
+            '    const-string v2, "action_backup_to_cloud"\n'
+            '\n'
+            '    .line 536\n'
+            '    .line 537\n'
+            '    invoke-static/range {v0 .. v6}, Lcom/oplus/aiunit/vision/g0i;->a(Ljava/util/LinkedHashMap;ILjava/lang/String;JZZ)V\n'
+        )
+        replacement = (
+            marker +
+            '\n'
+            '    sget v1, Lcom/oplus/gallery/photo_page/R$id;->action_backup_to_cloud:I\n'
+            '\n'
+            '    invoke-static {v1}, Ljava/lang/Integer;->valueOf(I)Ljava/lang/Integer;\n'
+            '\n'
+            '    move-result-object v1\n'
+            '\n'
+            '    invoke-virtual {v0, v1}, Ljava/util/LinkedHashMap;->remove(Ljava/lang/Object;)Ljava/lang/Object;\n'
+        )
+        if marker in data and 'LinkedHashMap;->remove(Ljava/lang/Object;)Ljava/lang/Object;' not in data:
+            smali.write_text(data.replace(marker, replacement, 1), encoding='utf-8')
 
-    data = smali.read_text(encoding='utf-8')
-    old = (
-        '    :cond_1\n'
-        '    :goto_0\n'
-        '    iget-object v0, v1, Lcom/oplus/gallery/settingpage/SettingsActivity$SettingFragment;->i:Landroidx/preference/PreferenceScreen;\n'
-        '\n'
-        '    .line 62\n'
-        '    .line 63\n'
-        '    const-string v3, "pref_category_key_sending"\n'
-    )
-    new = (
-        '    :cond_1\n'
-        '    :goto_0\n'
-        '    iget-object v0, v1, Lcom/oplus/gallery/settingpage/SettingsActivity$SettingFragment;->i:Landroidx/preference/PreferenceScreen;\n'
-        '\n'
-        '    if-eqz v0, :oplus_hide_google_photos_backup_settings_done\n'
-        '\n'
-        '    const-string v3, "pref_category_key_cloud_sync"\n'
-        '\n'
-        '    invoke-virtual {v0, v3}, Landroidx/preference/PreferenceGroup;->removePreferenceRecursively(Ljava/lang/CharSequence;)Z\n'
-        '\n'
-        '    const-string v3, "pref_category_cloud_sync_key"\n'
-        '\n'
-        '    invoke-virtual {v0, v3}, Landroidx/preference/PreferenceGroup;->removePreferenceRecursively(Ljava/lang/CharSequence;)Z\n'
-        '\n'
-        '    const-string v3, "pref_key_auto_sync_2"\n'
-        '\n'
-        '    invoke-virtual {v0, v3}, Landroidx/preference/PreferenceGroup;->removePreferenceRecursively(Ljava/lang/CharSequence;)Z\n'
-        '\n'
-        '    const-string v3, "pref_category_key_cloud_storage_space"\n'
-        '\n'
-        '    invoke-virtual {v0, v3}, Landroidx/preference/PreferenceGroup;->removePreferenceRecursively(Ljava/lang/CharSequence;)Z\n'
-        '\n'
-        '    :oplus_hide_google_photos_backup_settings_done\n'
-        '    iget-object v0, v1, Lcom/oplus/gallery/settingpage/SettingsActivity$SettingFragment;->i:Landroidx/preference/PreferenceScreen;\n'
-        '\n'
-        '    .line 62\n'
-        '    .line 63\n'
-        '    const-string v3, "pref_category_key_sending"\n'
-    )
-    fixed = data.replace(old, new, 1)
-    if fixed != data:
-        smali.write_text(fixed, encoding='utf-8')
-    elif ':oplus_hide_google_photos_backup_settings_done' not in data:
+    smali = Path(tmp_dir) / 'smali_classes10/com/oplus/aiunit/vision/urh.smali'
+    if smali.exists():
+        data = smali.read_text(encoding='utf-8')
+        if '.method public m()Z' not in data:
+            insert = (
+                '\n'
+                '.method public m()Z\n'
+                '    .locals 1\n'
+                '\n'
+                '    const/4 v0, 0x0\n'
+                '\n'
+                '    return v0\n'
+                '.end method\n'
+            )
+            data = data.replace('\n.method public n(Lcom/oplus/gallery/foundation/uikit/responsiveui/AppUiResponder$a;)V', insert + '\n.method public n(Lcom/oplus/gallery/foundation/uikit/responsiveui/AppUiResponder$a;)V', 1)
+            smali.write_text(data, encoding='utf-8')
+
+    for smali in glob.glob(str(Path(tmp_dir) / 'smali*/com/oplus/gallery/settingpage/SettingsActivity$SettingFragment.smali')):
+        data = Path(smali).read_text(encoding='utf-8')
+        if ':oplus_hide_google_photos_backup_settings_done' in data:
+            return
+        marker = re.search(
+            r'(?ms)^(    :cond_1\n'
+            r'    :goto_0\n'
+            r'    iget-object v0, v1, Lcom/oplus/gallery/settingpage/SettingsActivity\$SettingFragment;->[a-zA-Z0-9]+:Landroidx/preference/PreferenceScreen;\n'
+            r'\n'
+            r'    \.line \d+\n'
+            r'    \.line \d+\n'
+            r'    const-string v3, "pref_category_key_sending"\n)',
+            data,
+        )
+        if not marker:
+            continue
+        screen_load = re.search(
+            r'    iget-object v0, v1, Lcom/oplus/gallery/settingpage/SettingsActivity\$SettingFragment;->[a-zA-Z0-9]+:Landroidx/preference/PreferenceScreen;\n',
+            marker.group(1),
+        ).group(0)
+        insert = (
+            marker.group(1).replace('    const-string v3, "pref_category_key_sending"\n', '')
+            + '    if-eqz v0, :oplus_hide_google_photos_backup_settings_done\n'
+            + '\n'
+            + '    const-string v3, "pref_category_key_cloud_sync"\n'
+            + '\n'
+            + '    invoke-virtual {v0, v3}, Landroidx/preference/PreferenceGroup;->removePreferenceRecursively(Ljava/lang/CharSequence;)Z\n'
+            + '\n'
+            + '    const-string v3, "pref_category_cloud_sync_key"\n'
+            + '\n'
+            + '    invoke-virtual {v0, v3}, Landroidx/preference/PreferenceGroup;->removePreferenceRecursively(Ljava/lang/CharSequence;)Z\n'
+            + '\n'
+            + '    const-string v3, "pref_key_auto_sync_2"\n'
+            + '\n'
+            + '    invoke-virtual {v0, v3}, Landroidx/preference/PreferenceGroup;->removePreferenceRecursively(Ljava/lang/CharSequence;)Z\n'
+            + '\n'
+            + '    const-string v3, "pref_category_key_cloud_storage_space"\n'
+            + '\n'
+            + '    invoke-virtual {v0, v3}, Landroidx/preference/PreferenceGroup;->removePreferenceRecursively(Ljava/lang/CharSequence;)Z\n'
+            + '\n'
+            + '    :oplus_hide_google_photos_backup_settings_done\n'
+            + screen_load
+            + '\n'
+            + '    const-string v3, "pref_category_key_sending"\n'
+        )
+        fixed = data[:marker.start()] + insert + data[marker.end():]
+        Path(smali).write_text(fixed, encoding='utf-8')
         return
 
 
