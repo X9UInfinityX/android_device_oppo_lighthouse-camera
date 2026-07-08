@@ -61,6 +61,7 @@ PRODUCT_PRODUCT_PROPERTIES += \
     persist.sys.feature.localhdr_version=2 \
     persist.sys.feature.support.edrlistener=true \
     persist.sys.feature.uhdr.support=true \
+    persist.sys.oplus.anim_level=1 \
     persist.sys.camera.private.log.enable=debug,pre,mp \
     ro.build.version.module.sub_api=2 \
     ro.build.version.oplus.api=38 \
