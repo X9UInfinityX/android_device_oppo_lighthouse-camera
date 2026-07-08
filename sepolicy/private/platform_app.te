@@ -9,6 +9,12 @@ allow platform_app vendor_hal_hexlp_server:fd use;
 allow platform_app app_data_file:file { r_file_perms execute };
 auditallow platform_app app_data_file:file execute;
 
+# Gallery talks to Oplus performance service while rendering editor previews.
+allow platform_app horae:binder call;
+
+allow platform_app same_process_hal_file:file { getattr open read map };
+allow platform_app selinuxfs:file { getattr open read };
+
 allow platform_app oplus_accesscontrol_service:service_manager find;
 allow platform_app security_permission_service:service_manager find;
 set_prop(platform_app, oplus_systemclearservice_prop)

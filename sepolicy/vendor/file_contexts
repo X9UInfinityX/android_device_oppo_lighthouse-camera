@@ -60,6 +60,9 @@
 /(vendor|odm)/lib(64)?/libsnpe_htp\.so    u:object_r:same_process_hal_file:s0
 /(vendor|odm)/lib(64)?/libop-bokeh\.so    u:object_r:same_process_hal_file:s0
 /(vendor|odm)/lib(64)?/libalgo\.hdr\.so    u:object_r:same_process_hal_file:s0
+/(vendor|odm)/lib(64)?/libOPAlgoCamHDRTransformCamera\.so    u:object_r:same_process_hal_file:s0
+/(vendor|odm)/lib(64)?/libOPAlgoCamHDRTransformGallery\.so    u:object_r:same_process_hal_file:s0
+/(vendor|odm)/lib(64)?/libOPAlgoCamHDRTransformQuick\.so    u:object_r:same_process_hal_file:s0
 /(vendor|odm)/lib(64)?/libsegdepth\.so    u:object_r:same_process_hal_file:s0
 /(vendor|odm)/lib(64)?/libaideblur\.so    u:object_r:same_process_hal_file:s0
 /(vendor|odm)/lib(64)?/libVDUpScale\.so    u:object_r:same_process_hal_file:s0
@@ -543,6 +546,7 @@
 /vendor/lib(64)?/libarcsoft_calibverify_TriCamera\.so    u:object_r:same_process_hal_file:s0
 /(vendor|odm)/lib(64)?/qnn/libQnnHtpV68Stub\.so    u:object_r:same_process_hal_file:s0
 /vendor/lib(64)?/libstdc\+\+_vendor\.so  u:object_r:same_process_hal_file:s0
+/vendor/lib(64)?/libui-stock\.so    u:object_r:same_process_hal_file:s0
 /(vendor|odm)/lib(64)?/libXDocProcessSDK-jni.qti\.so u:object_r:same_process_hal_file:s0
 /(vendor|odm)/lib(64)?/libXDocProcessSDK-jni\.so    u:object_r:same_process_hal_file:s0
 /proc/devinfo/ufs u:object_r:proc_ufs_file:s0
