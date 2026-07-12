@@ -5701,6 +5701,59 @@ def blob_fixup_filemanager_copycut_skip_osense_scene(ctx, file, file_path, *args
     smali.write_text(fixed, encoding='utf-8')
 
 
+def blob_fixup_filemanager_superapp_zip_preview(ctx, file, file_path, *args, tmp_dir=None, **kwargs):
+    if tmp_dir is None:
+        return
+    smali = Path(tmp_dir) / 'smali' / 'com' / 'filemanager' / 'superapp' / 'ui' / 'superapp' / 'SuperListFragment$n.smali'
+    data = smali.read_text(encoding='utf-8')
+    if 'SuperApp archive preview direct' in data:
+        return
+    anchor = (
+        '    :cond_2\n'
+        '    invoke-static {p1}, Lkotlin/a;->b(Ljava/lang/Object;)V\n'
+        '\n'
+    )
+    insert = (
+        anchor +
+        '    iget-object p1, p0, Lcom/filemanager/superapp/ui/superapp/SuperListFragment$n;->i:Lcom/filemanager/common/base/c;\n'
+        '\n'
+        '    invoke-virtual {p1}, Lcom/filemanager/common/base/c;->t()I\n'
+        '\n'
+        '    move-result p1\n'
+        '\n'
+        '    const/16 v1, 0x80\n'
+        '\n'
+        '    if-ne p1, v1, :cond_superapp_archive_skip\n'
+        '\n'
+        '    const-string p1, "SuperListFragment"\n'
+        '\n'
+        '    const-string v1, "SuperApp archive preview direct"\n'
+        '\n'
+        '    invoke-static {p1, v1}, Lcom/filemanager/common/utils/g2;->b(Ljava/lang/String;Ljava/lang/String;)V\n'
+        '\n'
+        '    sget-object p1, Le8/a;->a:Le8/a;\n'
+        '\n'
+        '    iget-object v1, p0, Lcom/filemanager/superapp/ui/superapp/SuperListFragment$n;->l:Landroidx/fragment/app/FragmentActivity;\n'
+        '\n'
+        '    iget-object v2, p0, Lcom/filemanager/superapp/ui/superapp/SuperListFragment$n;->i:Lcom/filemanager/common/base/c;\n'
+        '\n'
+        '    const/high16 v3, 0x18000000\n'
+        '\n'
+        '    invoke-virtual {p1, v1, v2, v3}, Le8/a;->h(Landroid/app/Activity;Lcom/filemanager/common/base/c;I)V\n'
+        '\n'
+        '    sget-object p0, Lht/m;->a:Lht/m;\n'
+        '\n'
+        '    return-object p0\n'
+        '\n'
+        '    :cond_superapp_archive_skip\n'
+        '\n'
+    )
+    if anchor not in data:
+        raise ValueError('FileManager SuperListFragment archive click anchor not found')
+    data = data.replace(anchor, insert, 1)
+    smali.write_text(data, encoding='utf-8')
+
+
 def blob_fixup_filemanager_skip_osense_scene_actions(ctx, file, file_path, *args, tmp_dir=None, **kwargs):
     if tmp_dir is None:
         return
@@ -5863,6 +5916,7 @@ blob_fixups: blob_fixups_user_type = {
         .call(blob_fixup_filemanager_select_dir_current_path_fallback)
         .call(blob_fixup_filemanager_cut_skip_k0_when_same_disk)
         .call(blob_fixup_filemanager_copycut_skip_osense_scene)
+        .call(blob_fixup_filemanager_superapp_zip_preview)
         .call(blob_fixup_filemanager_skip_osense_scene_actions)
         .apktool_pack()
         .stripzip(),
