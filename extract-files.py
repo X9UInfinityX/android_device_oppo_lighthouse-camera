@@ -577,6 +577,57 @@ def blob_fixup_phonemanager_settings_category(ctx, file, file_path, *args, tmp_d
         raise ValueError('PhoneManager Settings category metadata not found')
 
 
+_SETTINGS_CATEGORY_ADVANCED_SECURITY_META = (
+    '<meta-data android:name="com.android.settings.category" '
+    'android:value="com.android.settings.category.ia.advanced_security"/>'
+)
+
+
+def blob_fixup_aonservice_settings_category(ctx, file, file_path, *args, tmp_dir=None, **kwargs):
+    # AONService's EZ Pay tile declares MANUFACTURER_APPLICATION_SETTING without
+    # an AOSP Settings category, so TileUtils can surface it on unrelated pages.
+    if tmp_dir is None:
+        return
+
+    manifest = Path(tmp_dir) / 'AndroidManifest.xml'
+    data = manifest.read_text(encoding='utf-8') if manifest.exists() else ''
+    if not data or _SETTINGS_CATEGORY_ADVANCED_SECURITY_META in data:
+        return
+
+    anchor = (
+        '<meta-data android:name="com.android.settings.title" '
+        'android:resource="@string/intelligent_perception_title_new"/>'
+    )
+    if anchor not in data:
+        raise ValueError('AONService Settings title metadata not found')
+
+    manifest.write_text(
+        data.replace(anchor, anchor + '\n            ' + _SETTINGS_CATEGORY_ADVANCED_SECURITY_META, 1),
+        encoding='utf-8',
+    )
+
+
+def blob_fixup_aiunit_settings_category(ctx, file, file_path, *args, tmp_dir=None, **kwargs):
+    # AIUnit's AI Service Engine tile uses the Oplus-only
+    # com.android.settings.category.export key, which AOSP TileUtils ignores.
+    if tmp_dir is None:
+        return
+
+    manifest = Path(tmp_dir) / 'AndroidManifest.xml'
+    data = manifest.read_text(encoding='utf-8') if manifest.exists() else ''
+    if not data or _SETTINGS_CATEGORY_ADVANCED_SECURITY_META in data:
+        return
+
+    old = (
+        '<meta-data android:name="com.android.settings.category.export" '
+        'android:value="com.oplus.settings.category.ia.strengthen_service"/>'
+    )
+    if old not in data:
+        raise ValueError('AIUnit Settings category metadata not found')
+
+    manifest.write_text(data.replace(old, _SETTINGS_CATEGORY_ADVANCED_SECURITY_META, 1), encoding='utf-8')
+
+
 def blob_fixup_phonemanager_permission_controller_package(ctx, file, file_path, *args, tmp_dir=None, **kwargs):
     if tmp_dir is None:
         return
@@ -5899,6 +5950,16 @@ blob_fixups: blob_fixups_user_type = {
         .call(blob_fixup_safecenter_receiver_flags)
         .call(blob_fixup_safecenter_olock_support)
         .call(blob_fixup_safecenter_olock_theft_dark_theme)
+        .apktool_pack()
+        .stripzip(),
+    'product/app/AONService/AONService.apk': blob_fixup()
+        .call(blob_fixup_apktool_unpack_manifest)
+        .call(blob_fixup_aonservice_settings_category)
+        .apktool_pack()
+        .stripzip(),
+    'product/priv-app/AIUnit/AIUnit.apk': blob_fixup()
+        .call(blob_fixup_apktool_unpack_manifest)
+        .call(blob_fixup_aiunit_settings_category)
         .apktool_pack()
         .stripzip(),
     'system_ext/etc/permissions/vendor-oplus-hardware-cryptoeng.xml': blob_fixup()

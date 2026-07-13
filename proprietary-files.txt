@@ -254,7 +254,7 @@ my_stock/app/AIMemory/lib/arm64/libscan_engine_detect.so:product/lib64/libscan_e
 my_stock/app/AIMemory/lib/arm64/libtensorflowlite.so:product/lib64/libtensorflowlite_aimemory.so;MODULE_SUFFIX=_aimemory;DISABLE_DEPS;SYMLINK=product/priv-app/AIMemory/lib/arm64/libtensorflowlite.so
 my_stock/app/AIMemory/lib/arm64/libwb_tables_549543368749780587_1.so:product/lib64/libwb_tables_549543368749780587_1.so;MODULE_SUFFIX=_aimemory;DISABLE_DEPS;SYMLINK=product/priv-app/AIMemory/lib/arm64/libwb_tables_549543368749780587_1.so
 my_stock/app/AIMemory/lib/arm64/libwbkit-seckit3.so:product/lib64/libwbkit-seckit3.so;MODULE_SUFFIX=_aimemory;DISABLE_DEPS;SYMLINK=product/priv-app/AIMemory/lib/arm64/libwbkit-seckit3.so
-my_product/app/AONService/AONService.apk:product/app/AONService/AONService.apk;PRESIGNED
+my_product/app/AONService/AONService.apk:product/app/AONService/AONService.apk
 my_product/app/AONService/lib/arm64/libNoTopK.so:product/lib64/libNoTopK.so;MODULE_SUFFIX=_aonservice;DISABLE_DEPS;SYMLINK=product/app/AONService/lib/arm64/libNoTopK.so
 my_product/app/AONService/lib/arm64/libPOSTPROCESS.so:product/lib64/libPOSTPROCESS.so;MODULE_SUFFIX=_aonservice;DISABLE_DEPS;SYMLINK=product/app/AONService/lib/arm64/libPOSTPROCESS.so
 my_product/app/AONService/lib/arm64/libROTATE90PAD.so:product/lib64/libROTATE90PAD.so;MODULE_SUFFIX=_aonservice;DISABLE_DEPS;SYMLINK=product/app/AONService/lib/arm64/libROTATE90PAD.so
