@@ -233,8 +233,11 @@ system_ext/lib64/libpenguin.so:vendor/lib64/libpenguin.so
 system_ext/lib64/libHeifEncoderWrapper.so
 system_ext/lib64/libHeifWinBufExchg-jni.so;DISABLE_CHECKELF
 system_ext/lib64/libNativeWinBuffExchange.so
+system_ext/lib64/liboplus_heifconverter.so;DISABLE_DEPS;DISABLE_CHECKELF
+system_ext/lib64/liboplusavenhancements.so;DISABLE_DEPS;DISABLE_CHECKELF
 system_ext/lib64/liboplusgui_jni.so;DISABLE_CHECKELF
 system_ext/lib64/liboplusheifwriter.so
+system_ext/lib64/liboplussfplugin_ccodec.so;DISABLE_DEPS;DISABLE_CHECKELF
 my_stock/priv-app/AIUnit/AIUnit.apk:product/priv-app/AIUnit/AIUnit.apk
 my_stock/priv-app/AIUnit/lib/arm64/libc++.so:product/lib64/libc++_aiunit.so;MODULE_SUFFIX=_aiunit;DISABLE_DEPS;SYMLINK=product/priv-app/AIUnit/lib/arm64/libc++.so
 my_stock/priv-app/AIUnit/lib/arm64/libc++_shared.so:product/lib64/libc++_shared_aiunit.so;MODULE_SUFFIX=_aiunit;DISABLE_DEPS;SYMLINK=product/priv-app/AIUnit/lib/arm64/libc++_shared.so
