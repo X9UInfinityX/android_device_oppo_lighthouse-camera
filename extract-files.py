@@ -805,12 +805,15 @@ def blob_fixup_securitypermission_safe_permissions(ctx, file, file_path, *args, 
         'com.oplus.permission.safe.APP_MANAGER',
         'com.oplus.permission.safe.ASSISTANT',
         'com.oplus.permission.safe.AUTHENTICATE',
+        'com.oplus.permission.safe.BACKUP',
+        'com.oplus.permission.safe.BLUETOOTH',
         'com.oplus.permission.safe.CAMERA',
         'com.oplus.permission.safe.CAR_LINK',
         'com.oplus.permission.safe.CONNECTIVITY',
         'com.oplus.permission.safe.IOT',
         'com.oplus.permission.safe.LOG',
         'com.oplus.permission.safe.MEDIA',
+        'com.oplus.permission.safe.PERSISTENT',
         'com.oplus.permission.safe.PHONE',
         'com.oplus.permission.safe.PICTURE',
         'com.oplus.permission.safe.POWER',
@@ -826,9 +829,14 @@ def blob_fixup_securitypermission_safe_permissions(ctx, file, file_path, *args, 
         'com.oppo.permission.safe.AI_APP',
         'com.oppo.permission.safe.AUTHENTICATE',
         'com.oppo.permission.safe.CAMERA',
+        'com.oppo.permission.safe.IOT',
         'com.oppo.permission.safe.PRIVATE',
         'com.oppo.permission.safe.SAU',
         'com.oppo.permission.safe.SECURITY',
+        'oplus.permission.settings.LAUNCH_FOR_EXPORT',
+        'com.oplus.metis.factdata.permission.DATABASE',
+        'com.oplus.flashback.permission.FLASH_VIEWS_SERVICE',
+        'heytap.speechassist.permission.ACTIVATE_SPEECH_ASSIST',
     ]
     block = ''.join(
         f'    <permission android:name="{permission}" android:protectionLevel="signature|privileged" />\n'
@@ -6025,6 +6033,13 @@ blob_fixups: blob_fixups_user_type = {
         .call(blob_fixup_filemanager_copycut_skip_osense_scene)
         .call(blob_fixup_filemanager_superapp_zip_preview)
         .call(blob_fixup_filemanager_skip_osense_scene_actions)
+        .apktool_pack()
+        .stripzip(),
+    'system_ext/app/Melody/Melody.apk': blob_fixup()
+        .call(blob_fixup_apktool_unpack_full)
+        .call(blob_fixup_opluscamera_uses_library)
+        .call(blob_fixup_oplus_camera_system_properties)
+        .call(blob_fixup_strip_oem_permissions)
         .apktool_pack()
         .stripzip(),
     'system_ext/priv-app/UMS/UMS.apk': blob_fixup()
