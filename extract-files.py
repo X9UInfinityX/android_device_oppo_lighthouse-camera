@@ -2321,6 +2321,81 @@ def blob_fixup_oplus_camera_system_properties(ctx, file, file_path, *args, tmp_d
             smali.write_text(fixed, encoding='utf-8')
 
 
+def blob_fixup_melody_repackaging_detector(ctx, file, file_path, *args, tmp_dir=None, **kwargs):
+    if tmp_dir is None:
+        return
+
+    # In Melody (com.oplus.melody), the built-in raw earphone whitelist (R.raw.melody_app_whitelist)
+    # is encrypted with AES-256-GCM using the SHA-256 hash of the OEM signing certificate.
+    # When the APK is re-signed with ROM platform/test keys, RepackagingDetector returns the
+    # hash of the new key, causing decryption to fail and resulting in an empty device feature list.
+    # We patch RepackagingDetector.b() / c() to always return the original stock certificate hash,
+    # and d() (LSPatch check) to return false.
+    key_body = (
+        '    .locals 1\n'
+        '\n'
+        '    const/16 v0, 0x20\n'
+        '\n'
+        '    new-array v0, v0, [B\n'
+        '\n'
+        '    fill-array-data v0, :array_0\n'
+        '\n'
+        '    return-object v0\n'
+        '\n'
+        '    :array_0\n'
+        '    .array-data 1\n'
+        '        -0x50t\n'
+        '        -0x57t\n'
+        '        -0x45t\n'
+        '        -0x4t\n'
+        '        0x5t\n'
+        '        -0x12t\n'
+        '        -0x1bt\n'
+        '        -0x19t\n'
+        '        -0x30t\n'
+        '        -0x5et\n'
+        '        -0x37t\n'
+        '        0x7ct\n'
+        '        0x3t\n'
+        '        0x5t\n'
+        '        -0x7at\n'
+        '        -0x1ft\n'
+        '        0x5bt\n'
+        '        -0x4dt\n'
+        '        0x30t\n'
+        '        0x11t\n'
+        '        0x52t\n'
+        '        0x7t\n'
+        '        -0x71t\n'
+        '        0x54t\n'
+        '        0x47t\n'
+        '        0x3bt\n'
+        '        -0x48t\n'
+        '        0x2dt\n'
+        '        -0xat\n'
+        '        -0x28t\n'
+        '        -0x38t\n'
+        '        0x18t\n'
+        '    .end array-data\n'
+    )
+    lspatch_body = (
+        '    .locals 1\n'
+        '\n'
+        '    const/4 v0, 0x0\n'
+        '\n'
+        '    return v0\n'
+    )
+
+    for smali in Path(tmp_dir).glob('smali*/**/L.smali'):
+        data = smali.read_text(encoding='utf-8')
+        if 'RepackagingDetector' not in data:
+            continue
+        data = _replace_smali_method(data, 'public static b(Lcom/oplus/melody/MelodyApplication;)[B', key_body)
+        data = _replace_smali_method(data, 'public static c(Lcom/oplus/melody/MelodyApplication;)[B', key_body)
+        data = _replace_smali_method(data, 'public static d(Lcom/oplus/melody/MelodyApplication;)Z', lspatch_body)
+        smali.write_text(data, encoding='utf-8')
+
+
 def blob_fixup_oplus_camera_framework_shims(ctx, file, file_path, *args, tmp_dir=None, **kwargs):
     if tmp_dir is None:
         return
@@ -6040,6 +6115,7 @@ blob_fixups: blob_fixups_user_type = {
         .call(blob_fixup_opluscamera_uses_library)
         .call(blob_fixup_oplus_camera_system_properties)
         .call(blob_fixup_strip_oem_permissions)
+        .call(blob_fixup_melody_repackaging_detector)
         .apktool_pack()
         .stripzip(),
     'system_ext/priv-app/UMS/UMS.apk': blob_fixup()
