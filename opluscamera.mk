@@ -1,5 +1,5 @@
 # OPlus Camera source tree
-OPLUS_CAMERA_PATH := device/oneplus/infiniti-camera
+OPLUS_CAMERA_PATH := device/oppo/lighthouse-camera
 
 # Blob dependencies
 PRODUCT_PACKAGES += \
@@ -33,7 +33,7 @@ PRODUCT_COPY_FILES += \
     $(OPLUS_CAMERA_PATH)/configs/sysconfig/hiddenapi-package-oplus-whitelist.xml:$(TARGET_COPY_OUT_SYSTEM)/etc/sysconfig/hiddenapi-package-oplus-whitelist.xml
 
 # Gallery's ODNN retouch path dlopens QNN libraries by basename. Install the
-# OP15 QNN runtime in system_ext and place real copies in Gallery's native lib dir.
+# Find X9 Ultra QNN runtime in system_ext and place real copies in Gallery's native lib dir.
 PRODUCT_PACKAGES += \
     libQnnHtp_gallery_system_ext \
     libQnnHtpPrepare_gallery_system_ext \
@@ -105,8 +105,8 @@ PRODUCT_PRODUCT_PROPERTIES += \
 
 PRODUCT_VENDOR_PROPERTIES += \
     ro.camera.enableCamera1MaxZsl=1 \
-    ro.vendor.oplus.camera.backCamSize=50MP+50MP+50MP \
-    ro.vendor.oplus.camera.frontCamSize=32MP
+    ro.vendor.oplus.camera.backCamSize=200MP+200MP+50MP+50MP \
+    ro.vendor.oplus.camera.frontCamSize=50MP
 
 PRODUCT_SYSTEM_EXT_PROPERTIES += \
     ro.build.version.oplus.api=38 \
@@ -120,7 +120,7 @@ $(call soong_config_set,camera,package_name,com.oplus.packageName)
 $(call soong_config_set_bool,camera,override_format_from_reserved,true)
 
 # SEpolicy
-include device/oneplus/infiniti-camera/sepolicy/SEPolicy.mk
+include device/oppo/lighthouse-camera/sepolicy/SEPolicy.mk
 
 # Inherit from camera-vendor.mk
-$(call inherit-product-if-exists, vendor/oneplus/infiniti-camera/infiniti-camera-vendor.mk)
+$(call inherit-product-if-exists, vendor/oppo/lighthouse-camera/lighthouse-camera-vendor.mk)

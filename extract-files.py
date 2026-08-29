@@ -6150,15 +6150,15 @@ blob_fixups: blob_fixups_user_type = {
 }  # fmt: skip
 
 namespace_imports = [
-    'vendor/oneplus/infiniti',
+    'vendor/oppo/lighthouse',
     'vendor/oneplus/sm8850-common',
     'hardware/oplus',
 ]
 
 module = ExtractUtilsModule(
-    'infiniti-camera',
-    'oneplus',
-    device_rel_path='device/oneplus/infiniti-camera',
+    'lighthouse-camera',
+    'oppo',
+    device_rel_path='device/oppo/lighthouse-camera',
     blob_fixups=blob_fixups,
     lib_fixups=lib_fixups,
     namespace_imports=namespace_imports,
@@ -6173,8 +6173,8 @@ import os
 import re
 
 
-CUSTOM_SOONG_BEGIN = "// BEGIN INFINITI-CAMERA CUSTOM SOONG MODULES"
-CUSTOM_SOONG_END = "// END INFINITI-CAMERA CUSTOM SOONG MODULES"
+CUSTOM_SOONG_BEGIN = "// BEGIN LIGHTHOUSE-CAMERA CUSTOM SOONG MODULES"
+CUSTOM_SOONG_END = "// END LIGHTHOUSE-CAMERA CUSTOM SOONG MODULES"
 
 
 def write_custom_android_bp():
@@ -6183,7 +6183,7 @@ def write_custom_android_bp():
         Path(__file__).resolve().parents[3],
     ))
 
-    android_bp = top / "vendor" / "oneplus" / "infiniti-camera" / "Android.bp"
+    android_bp = top / "vendor" / "oppo" / "lighthouse-camera" / "Android.bp"
     if not android_bp.exists():
         return
 

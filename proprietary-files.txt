@@ -1,5 +1,5 @@
 ## All proprietary files from this list, unless pinned and noted otherwise,
-## are from OnePlus 15 (OxygenOS 16 CPH2745_11_A.01)
+## are from OPPO Find X9 Ultra (CPH2841_16.0.9.403(EX01)).
 
 # Camera
 my_product/app/OplusCamera/OplusCamera.apk:system_ext/priv-app/OplusCamera/OplusCamera.apk;OVERRIDES=Camera2,GoogleCameraGo
@@ -64,7 +64,7 @@ odm/lib64/libalogencrypt.so
 odm/lib/libalogencrypt.so
 odm/lib64/libarcsoft_hdr_couple_api.so:odm/lib64/libarcsoft_hdr_couple_api_V2.so;DISABLE_CHECKELF
 
-# OP15 camera/QNN runtime assets
+# Find X9 Ultra camera/QNN runtime assets
 odm/etc/camera/fb_model/000.png
 odm/etc/camera/fb_model/000_pre.bin
 odm/etc/camera/fb_model/000_pre.png

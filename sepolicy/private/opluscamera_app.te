@@ -19,7 +19,7 @@ allow opluscamera_app rootfs:dir              getattr;
 allow opluscamera_app proc_vmstat:file        r_file_perms;
 r_dir_file(opluscamera_app, proc_net_type)
 
-# Stock OP15 APS stores deferred-capture job bookkeeping here.
+# Stock Find X9 Ultra APS stores deferred-capture job bookkeeping here.
 allow opluscamera_app data_system_camera_rus:dir { read write create getattr setattr rename open add_name search };
 allow opluscamera_app data_system_camera_rus:file { read write create getattr setattr append unlink rename open };
 

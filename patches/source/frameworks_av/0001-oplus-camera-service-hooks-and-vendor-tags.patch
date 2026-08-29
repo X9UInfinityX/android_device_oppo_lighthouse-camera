@@ -12,7 +12,7 @@ index 203f27650c..810fc5d1e4 100644
 +};
 +
 +static const OplusVendorTagAlias kOplusVendorTagAliases[] = {
-+        // OPlus camera SDK names which are not exposed literally by the OP15 HAL.
++        // OPlus camera SDK names which are not exposed literally by the lighthouse HAL.
 +        // Keep this list conservative: only map to tags with the same request intent.
 +        {"burst.capture.single", "com.oplus.burst.capture"},
 +        {"full.bining.qbc.enable", "com.oplus.quad2binning"},
@@ -43,7 +43,7 @@ index 203f27650c..810fc5d1e4 100644
 +                    }
 +
 +                    if (CameraMetadata::getTagFromName(alias.to, vTags, &candidateTag) == OK) {
-+                        ALOGI("%s: resolved OP15 vendor tag alias %s.%s -> %s",
++                        ALOGI("%s: resolved lighthouse vendor tag alias %s.%s -> %s",
 +                              __FUNCTION__, section, nameTagName, alias.to);
 +                        *tag = candidateTag;
 +                        return OK;
