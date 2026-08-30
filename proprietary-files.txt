@@ -61,7 +61,6 @@ my_product/lib64/libst_sticker_jni.so:system_ext/lib64/libst_sticker_jni.so;FIX_
 
 odm/lib64/libOplusSecurity.so
 odm/lib64/libalogencrypt.so
-odm/lib/libalogencrypt.so
 odm/lib64/libarcsoft_hdr_couple_api.so:odm/lib64/libarcsoft_hdr_couple_api_V2.so;DISABLE_CHECKELF
 
 # Find X9 Ultra camera/QNN runtime assets
@@ -222,7 +221,7 @@ vendor/lib64/qsn3_video.bin
 vendor/lib64/qsn3all.bin
 my_product/etc/camera/cdr_aging_set.json:system_ext/etc/camera/cdr_aging_set.json
 my_product/etc/camera/engineer_camera_config.json:system_ext/etc/camera/engineer_camera_config.json
-my_product/etc/camera/mt105CalibrationCfg.xml:system_ext/etc/camera/mt105CalibrationCfg.xml
+my_product/etc/camera/mt120CalibrationCfg.xml:system_ext/etc/camera/mt120CalibrationCfg.xml
 my_product/etc/camera/mtCalibrationCfg.xml:system_ext/etc/camera/mtCalibrationCfg.xml
 my_product/etc/camera/mwCalibrationCfg.xml:system_ext/etc/camera/mwCalibrationCfg.xml
 
@@ -299,12 +298,6 @@ odm/firmware/secure_ta/cryptoeng.b06
 odm/firmware/secure_ta/cryptoeng.b07
 odm/firmware/secure_ta/cryptoeng.b08
 odm/firmware/secure_ta/cryptoeng.mdt
-odm/lib/lib_cryptoeng_api.so;DISABLE_DEPS
-odm/lib/libqsee_keybox_ca.so;DISABLE_DEPS
-odm/lib/vendor.oplus.hardware.fido.fidoca-V1-ndk.so;DISABLE_DEPS
-odm/lib/vendor.oplus.hardware.fido.fido2ca-V1-ndk.so;DISABLE_DEPS
-odm/lib/vendor.oplus.hardware.cryptoeng-V1-ndk.so;MODULE_SUFFIX=_odm;DISABLE_DEPS
-odm/lib/vendor.oplus.hardware.cryptoeng@1.0.so;MODULE_SUFFIX=_odm;DISABLE_DEPS
 odm/lib64/lib_cryptoeng_api.so;DISABLE_DEPS
 odm/lib64/libqsee_keybox_ca.so;DISABLE_DEPS
 odm/lib64/vendor.oplus.hardware.fido.fidoca-V1-ndk.so;DISABLE_DEPS

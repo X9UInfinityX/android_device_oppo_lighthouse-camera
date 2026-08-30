@@ -1,4 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <extend_features>
+    <!-- CPH2841_16.0.9.403 camera/gallery/AON product capabilities. -->
+    <app_feature name="oplus.camera.mag.handle.support" args="boolean:true"/>
+    <app_feature name="oplus.camera.out.flash.support" args="boolean:true"/>
+    <app_feature name="pre.open.camera.from.launcher"/>
+    <app_feature name="oplus.camera.slowvideo.4k.support" args="boolean:true"/>
+    <app_feature name="com.oplus.gesture.camera_spruce_light_press_support" args="boolean:true"/>
+    <app_feature name="os.graphic.gallery.collage.livephoto" args="boolean:true"/>
+    <app_feature name="com.aiunit.aon.focal_length" args="float:176"/>
+    <app_feature name="com.aiunit.aon.bias" args="float:2.5"/>
+    <app_feature name="com.aiunit.aon.blink_scale" args="float:0.9"/>
     <app_feature name="com.oplus.ambient.livealert.setting_switch" args="boolean:true"/>
 </extend_features>

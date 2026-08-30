@@ -75,6 +75,13 @@ def _replace_smali_method(data: str, signature: str, body: str) -> str:
     )
 
 
+def _find_smali(tmp_dir: str, relative_path: str, description: str) -> Path:
+    smali = next(Path(tmp_dir).glob(f'smali*/{relative_path}'), None)
+    if smali is None:
+        raise ValueError(f'{description} smali not found')
+    return smali
+
+
 def _empty_map_smali_body() -> str:
     return (
         '    .locals 1\n'
@@ -174,7 +181,16 @@ def blob_fixup_opluscamera_blur_seginit_guard(ctx, file, file_path, *args, tmp_d
     if tmp_dir is None:
         return
 
-    process_smali = next(Path(tmp_dir).glob('smali*/ub/b.smali'), None)
+    process_smali = next(
+        (
+            path
+            for path in Path(tmp_dir).glob('smali*/**/*.smali')
+            if '"OplusBlurProcess"' in path.read_text(encoding='utf-8', errors='ignore')
+            and '->segInit(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;II)[I' in path.read_text(encoding='utf-8', errors='ignore')
+            and 'monitor-enter' in path.read_text(encoding='utf-8', errors='ignore')
+        ),
+        None,
+    )
     if process_smali is None:
         raise ValueError('OplusCamera blur process smali not found')
 
@@ -182,19 +198,25 @@ def blob_fixup_opluscamera_blur_seginit_guard(ctx, file, file_path, *args, tmp_d
     if '/odm/etc/camera/singleblur/personseg.bin' not in data:
         raise ValueError('OplusCamera blur process segInit anchor not found')
 
+    monitor_match = re.search(r'    monitor-enter (?P<register>[vp]\d+)\n', data)
+    if monitor_match is None:
+        raise ValueError('OplusCamera blur process monitor anchor not found')
+    monitor_register = monitor_match.group('register')
     fixed, count = re.subn(
-        r'(?s)(invoke-virtual/range \{v1 \.\. v7\}, Lcom/oplus/ocs/camera/OplusBlurPreviewHelper;->segInit\(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;II\)\[I.*?'
-        r'move-result-object v0.*?'
-        r'sput-object v0, Lub/b;->w:\[I)',
+        r'(?s)(invoke-virtual/range \{[vp]\d+ \.\. [vp]\d+\}, Lcom/oplus/ocs/camera/OplusBlurPreviewHelper;->segInit\(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;II\)\[I.*?'
+        r'move-result-object (?P<result>[vp]\d+).*?'
+        r'sput-object (?P=result), L[^;]+;->w:\[I)',
         r'\1'
         '\n\n'
-        '    if-nez v0, :cond_codex_blur_seginit_ok\n'
+        r'    if-nez \g<result>, :cond_lighthouse_blur_seginit_ok\n'
         '\n'
-        '    monitor-exit v10\n'
+        '    const/4 v0, 0x0\n'
         '\n'
-        '    return v12\n'
+        f'    monitor-exit {monitor_register}\n'
         '\n'
-        '    :cond_codex_blur_seginit_ok',
+        '    return v0\n'
+        '\n'
+        '    :cond_lighthouse_blur_seginit_ok',
         data,
         count=1,
     )
@@ -202,7 +224,15 @@ def blob_fixup_opluscamera_blur_seginit_guard(ctx, file, file_path, *args, tmp_d
         raise ValueError('OplusCamera blur process segInit write not patched')
     process_smali.write_text(fixed, encoding='utf-8')
 
-    texture_smali = next(Path(tmp_dir).glob('smali*/wb/k.smali'), None)
+    texture_smali = next(
+        (
+            path
+            for path in Path(tmp_dir).glob('smali*/**/*.smali')
+            if '"initSegForSizeChange, segInit, cost: "' in path.read_text(encoding='utf-8', errors='ignore')
+            and '->segInit(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;II)[I' in path.read_text(encoding='utf-8', errors='ignore')
+        ),
+        None,
+    )
     if texture_smali is None:
         raise ValueError('OplusCamera blur texture smali not found')
 
@@ -211,16 +241,16 @@ def blob_fixup_opluscamera_blur_seginit_guard(ctx, file, file_path, *args, tmp_d
         raise ValueError('OplusCamera blur size-change segInit anchor not found')
 
     fixed, count = re.subn(
-        r'(?s)(invoke-virtual/range \{v3 \.\. v9\}, Lcom/oplus/ocs/camera/OplusBlurPreviewHelper;->segInit\(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;II\)\[I.*?'
-        r'move-result-object p0.*?'
-        r'sput-object p0, Lub/b;->w:\[I)',
+        r'(?s)(invoke-virtual/range \{[vp]\d+ \.\. [vp]\d+\}, Lcom/oplus/ocs/camera/OplusBlurPreviewHelper;->segInit\(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;II\)\[I.*?'
+        r'move-result-object (?P<result>[vp]\d+).*?'
+        r'sput-object (?P=result), L[^;]+;->w:\[I)',
         r'\1'
         '\n\n'
-        '    if-nez p0, :cond_codex_blur_size_seginit_ok\n'
+        r'    if-nez \g<result>, :cond_lighthouse_blur_size_seginit_ok\n'
         '\n'
         '    return-void\n'
         '\n'
-        '    :cond_codex_blur_size_seginit_ok',
+        '    :cond_lighthouse_blur_size_seginit_ok',
         data,
         count=1,
     )
@@ -462,10 +492,19 @@ def blob_fixup_fileencryption_biometric_enrollment_checks(ctx, file, file_path, 
     if tmp_dir is None:
         return
 
-    smali = Path(tmp_dir) / 'smali/c9/a.smali'
-    data = smali.read_text(encoding='utf-8') if smali.exists() else ''
-    if not data:
+    smali = next(
+        (
+            path
+            for path in Path(tmp_dir).glob('smali*/**/*.smali')
+            if '.source "BiometricsUnlockManager.kt"' in path.read_text(encoding='utf-8', errors='ignore')
+            and '.method public static final b(Landroid/content/Context;)Z' in path.read_text(encoding='utf-8', errors='ignore')
+            and '.method public static final c(Landroid/content/Context;)Z' in path.read_text(encoding='utf-8', errors='ignore')
+        ),
+        None,
+    )
+    if smali is None:
         raise ValueError('FileEncryption biometric helper not found')
+    data = smali.read_text(encoding='utf-8')
 
     face_body = (
         '    .locals 2\n'
@@ -668,7 +707,7 @@ def blob_fixup_cryptoeng_permissions_xml(ctx, file, file_path, *args, tmp_dir=No
 def blob_fixup_cryptoeng_init_rc(ctx, file, file_path, *args, tmp_dir=None, **kwargs):
     path = Path(file_path)
     data = path.read_text(encoding='utf-8')
-    data = data.replace(
+    fixed = data.replace(
         '    mkdir /data/vendor_de/0/cryptoeng 0770 system system encryption=None\n',
         '    mkdir /data/vendor_de/0/cryptoeng 0770 system system encryption=None\n'
         '    restorecon_recursive /data/vendor_de/0/cryptoeng\n',
@@ -681,7 +720,7 @@ def blob_fixup_cryptoeng_init_rc(ctx, file, file_path, *args, tmp_dir=None, **kw
         '        chown system system /mnt/vendor/persist/data/pfm/licenses/oplus_PPID_licenses.pfm\n'
         '    fi\n'
     )
-    fixed = data.replace(old, '')
+    fixed = fixed.replace(old, '')
     if fixed != data:
         path.write_text(fixed, encoding='utf-8')
 
@@ -852,65 +891,81 @@ def blob_fixup_oppogallery_receiver_flags(ctx, file, file_path, *args, tmp_dir=N
     if tmp_dir is None:
         return
 
-    smali = Path(tmp_dir) / 'smali_classes8/com/oplus/aiunit/vision/ey.smali'
-    data = smali.read_text(encoding='utf-8') if smali.exists() else ''
+    # BroadcastDispatcher's proxy path carries the caller's flags in p2/v9.
+    # Force RECEIVER_NOT_EXPORTED while preserving all unrelated flag bits.
+    dispatcher = next(
+        (
+            path
+            for path in Path(tmp_dir).glob('smali*/com/oplus/aiunit/vision/*.smali')
+            if '.source "BroadcastDispatcher.kt"' in path.read_text(encoding='utf-8', errors='ignore')
+            and 'Lcom/oplus/gallery/foundation/uikit/broadcast/bus/ProxyReceiver;' in path.read_text(encoding='utf-8', errors='ignore')
+        ),
+        None,
+    )
+    if dispatcher is None:
+        raise ValueError('OppoGallery2 BroadcastDispatcher not found')
+    data = dispatcher.read_text(encoding='utf-8')
     old = (
-        '    iget v6, v0, Lcom/oplus/aiunit/vision/gy;->c:I\n'
+        '    move v9, p2\n'
         '\n'
-        '    invoke-virtual/range {v1 .. v6}, Landroid/content/Context;->registerReceiver(Landroid/content/BroadcastReceiver;Landroid/content/IntentFilter;Ljava/lang/String;Landroid/os/Handler;I)Landroid/content/Intent;\n'
+        '    .line 275\n'
+        '    invoke-virtual/range {v4 .. v9}, Landroid/content/Context;->registerReceiver(Landroid/content/BroadcastReceiver;Landroid/content/IntentFilter;Ljava/lang/String;Landroid/os/Handler;I)Landroid/content/Intent;\n'
     )
     new = (
-        '    iget v6, v0, Lcom/oplus/aiunit/vision/gy;->c:I\n'
+        '    move v9, p2\n'
         '\n'
-        '    and-int/lit8 v6, v6, -0x3\n'
+        '    and-int/lit8 v9, v9, -0x3\n'
         '\n'
-        '    or-int/lit8 v6, v6, 0x4\n'
+        '    or-int/lit8 v9, v9, 0x4\n'
         '\n'
-        '    invoke-virtual/range {v1 .. v6}, Landroid/content/Context;->registerReceiver(Landroid/content/BroadcastReceiver;Landroid/content/IntentFilter;Ljava/lang/String;Landroid/os/Handler;I)Landroid/content/Intent;\n'
+        '    .line 275\n'
+        '    invoke-virtual/range {v4 .. v9}, Landroid/content/Context;->registerReceiver(Landroid/content/BroadcastReceiver;Landroid/content/IntentFilter;Ljava/lang/String;Landroid/os/Handler;I)Landroid/content/Intent;\n'
     )
-    fixed = data.replace(old, new)
-    if fixed != data:
-        smali.write_text(fixed, encoding='utf-8')
+    fixed = data.replace(old, new, 1)
+    if fixed == data and 'or-int/lit8 v9, v9, 0x4' not in data:
+        raise ValueError('OppoGallery2 BroadcastDispatcher receiver flag patch point not found')
+    dispatcher.write_text(fixed, encoding='utf-8')
 
-    smali = Path(tmp_dir) / 'smali_classes9/com/oplus/gallery/foundation/uikit/broadcast/bus/ActionReceiver.smali'
-    data = smali.read_text(encoding='utf-8') if smali.exists() else ''
-    old = (
-        '    iget v7, v0, Lcom/oplus/aiunit/vision/a10;->c:I\n'
-        '\n'
-        '    .line 62\n'
-        '    .line 63\n'
-        '    move-object v3, p0\n'
-        '\n'
-        '    .line 64\n'
-        '    invoke-virtual/range {v2 .. v7}, Landroid/content/Context;->registerReceiver(Landroid/content/BroadcastReceiver;Landroid/content/IntentFilter;Ljava/lang/String;Landroid/os/Handler;I)Landroid/content/Intent;\n'
+    # ActionReceiver is a second, independent registration path with flags in
+    # its properties object. Apply the same exported-bit normalization there.
+    receiver = _find_smali(
+        tmp_dir,
+        'com/oplus/gallery/foundation/uikit/broadcast/bus/ActionReceiver.smali',
+        'OppoGallery2 ActionReceiver',
     )
-    new = (
-        '    iget v7, v0, Lcom/oplus/aiunit/vision/a10;->c:I\n'
-        '\n'
-        '    and-int/lit8 v7, v7, -0x3\n'
-        '\n'
-        '    or-int/lit8 v7, v7, 0x4\n'
-        '\n'
-        '    .line 62\n'
-        '    .line 63\n'
-        '    move-object v3, p0\n'
-        '\n'
-        '    .line 64\n'
-        '    invoke-virtual/range {v2 .. v7}, Landroid/content/Context;->registerReceiver(Landroid/content/BroadcastReceiver;Landroid/content/IntentFilter;Ljava/lang/String;Landroid/os/Handler;I)Landroid/content/Intent;\n'
+    data = receiver.read_text(encoding='utf-8')
+    pattern = re.compile(
+        r'(    iget (?P<flags>v\d+), v0, L[^;]+;->c:I\n)'
+        r'(?P<middle>(?:\n|    \.line \d+\n|    move-object v3, p0\n)*)'
+        r'(    invoke-virtual/range \{v2 \.\. (?P=flags)\}, Landroid/content/Context;->registerReceiver\(Landroid/content/BroadcastReceiver;Landroid/content/IntentFilter;Ljava/lang/String;Landroid/os/Handler;I\)Landroid/content/Intent;\n)'
     )
-    fixed = data.replace(old, new)
-    if fixed != data:
-        smali.write_text(fixed, encoding='utf-8')
-    elif smali.exists() and 'or-int/lit8 v7, v7, 0x4' not in data:
+    fixed, count = pattern.subn(
+        r'\1'
+        r'\n'
+        r'    and-int/lit8 \g<flags>, \g<flags>, -0x3\n'
+        r'\n'
+        r'    or-int/lit8 \g<flags>, \g<flags>, 0x4\n'
+        r'\g<middle>\3',
+        data,
+        count=1,
+    )
+    if count != 1 and 'or-int/lit8 v7, v7, 0x4' not in data:
         raise ValueError('OppoGallery2 ActionReceiver receiver flag patch point not found')
+    receiver.write_text(fixed, encoding='utf-8')
 
 
 def blob_fixup_oppogallery_wallpaper_attach_intent(ctx, file, file_path, *args, tmp_dir=None, **kwargs):
     if tmp_dir is None:
         return
 
-    smali = Path(tmp_dir) / 'smali_classes10/com/oplus/gallery/pictureeditorpage/PictureEditorDM.smali'
-    data = smali.read_text(encoding='utf-8') if smali.exists() else ''
+    smali = _find_smali(
+        tmp_dir,
+        'com/oplus/gallery/pictureeditorpage/PictureEditorDM.smali',
+        'OppoGallery2 PictureEditorDM',
+    )
+    data = smali.read_text(encoding='utf-8')
+    if 'getCropAndSetWallpaperIntent' not in data:
+        raise ValueError('OppoGallery2 wallpaper crop-intent implementation not found')
     replacement = (
         '.method public final a(Landroid/app/Activity;Landroid/net/Uri;)V\n'
         '    .locals 3\n'
@@ -965,43 +1020,22 @@ def blob_fixup_oppogallery_safe_box_custom_flag(ctx, file, file_path, *args, tmp
     smali = next(
         (
             path
-            for path in Path(tmp_dir).glob('smali*/com/oplus/aiunit/vision/mn4.smali')
-            if '.method public static final f(Ljava/lang/String;ZZ)Z' in path.read_text(encoding='utf-8')
+            for path in Path(tmp_dir).glob('smali*/com/oplus/aiunit/vision/*.smali')
+            if '.source "ConfigAbilityWrapper.kt"' in path.read_text(encoding='utf-8', errors='ignore')
+            and '.method public static final c(Ljava/lang/String;ZZ)Z' in path.read_text(encoding='utf-8', errors='ignore')
         ),
         None,
     )
     if smali is None:
-        pattern = re.compile(
-            r'(    const-string (?P<key>[vp]\d+), "feature_is_support_user_custom_safe_box"\n'
-            r'(?:\n|    \.line \d+\n)*'
-            r'    const/4 (?P<flags>[vp]\d+), 0x6\n'
-            r'(?:\n|    \.line \d+\n)*)'
-            r'    invoke-static \{(?P=key), (?P<result>[vp]\d+), (?P=flags)\}, Lcom/oplus/aiunit/vision/c25;->d\(Ljava/lang/String;ZI\)Z\n'
-            r'(?:\n|    \.line \d+\n)*'
-            r'    move-result (?P=result)\n'
-        )
-        for smali in Path(tmp_dir).glob('smali*/com/oplus/aiunit/vision/*.smali'):
-            data = smali.read_text(encoding='utf-8')
-            if 'feature_is_support_user_custom_safe_box' not in data:
-                continue
-            fixed = pattern.sub(r'\1    const/4 \g<result>, 0x1\n', data, count=1)
-            if fixed != data:
-                smali.write_text(fixed, encoding='utf-8')
-                return
-            if 'feature_is_support_user_custom_safe_box' in data and '    const/4 p1, 0x1\n\n    if-nez p1,' in data:
-                return
-        raise ValueError('OppoGallery2 SafeBox config patch point not found')
+        raise ValueError('OppoGallery2 ConfigAbilityWrapper not found')
     data = smali.read_text(encoding='utf-8')
     pattern = re.compile(
-        r'(\.method public static final f\(Ljava/lang/String;ZZ\)Z\n'
+        r'(\.method public static final c\(Ljava/lang/String;ZZ\)Z\n'
         r'    \.locals 3\n'
         r'.*?'
         r'    invoke-static \{p0, v0\}, Lkotlin/jvm/internal/Intrinsics;->checkNotNullParameter\(Ljava/lang/Object;Ljava/lang/String;\)V\n'
-        r'\n)'
-        r'(    \.line 4\n'
-        r'    \.line 5\n'
-        r'    \.line 6\n'
-        r'    sget-object v0, Lcom/oplus/aiunit/vision/fr4;->a:Landroid/content/Context;\n)',
+        r'(?:\n|    \.line \d+\n)*)'
+        r'(    sget-object v0, L[^;]+;->a:L[^;]+;\n)',
         re.DOTALL,
     )
     insert = (
@@ -1012,22 +1046,19 @@ def blob_fixup_oppogallery_safe_box_custom_flag(ctx, file, file_path, *args, tmp
         '\n'
         '    move-result v0\n'
         '\n'
-        '    if-eqz v0, :oplus_safe_box_config_default_f\n'
+        '    if-eqz v0, :oplus_safe_box_config_default_c\n'
         '\n'
         '    const/4 p0, 0x1\n'
         '\n'
         '    return p0\n'
         '\n'
-        '    :oplus_safe_box_config_default_f\n'
-        '\n'
-        '    const-string v0, "configId"\n'
-        '\n'
+        '    :oplus_safe_box_config_default_c\n'
         r'\2'
     )
     fixed, count = pattern.subn(insert, data, count=1)
     if fixed != data:
         smali.write_text(fixed, encoding='utf-8')
-    elif ':oplus_safe_box_config_default_f' not in data:
+    elif ':oplus_safe_box_config_default_c' not in data:
         raise ValueError('OppoGallery2 SafeBox config patch point not found')
 
 
@@ -1035,46 +1066,73 @@ def blob_fixup_oppogallery_google_photos_consent_on_verify_failure(ctx, file, fi
     if tmp_dir is None:
         return
 
-    smali = Path(tmp_dir) / 'smali_classes8/com/oplus/aiunit/vision/bi8$a.smali'
-    data = smali.read_text(encoding='utf-8') if smali.exists() else ''
-    old = (
-        '    if-eqz p1, :cond_0\n'
-        '\n'
-        '    .line 14\n'
-        '    .line 15\n'
-        '    sget-object v3, Lcom/oplus/aiunit/vision/we1;->a:Lcom/oplus/aiunit/vision/we1;\n'
+    # GCloudPageHelper registers this listener before verifyAppState(). Stock
+    # only opens the backup page when the callback boolean is true. On a port,
+    # verification can return false before Google Photos has shown its consent
+    # UI, so continue through the existing page helper for either result.
+    smali = next(
+        (
+            path
+            for path in Path(tmp_dir).glob('smali*/com/oplus/aiunit/vision/*.smali')
+            if '.source "GCloudPageHelper.kt"' in path.read_text(encoding='utf-8', errors='ignore')
+            and 'Lcom/oplus/aiunit/vision/mlf;->e:' in path.read_text(encoding='utf-8', errors='ignore')
+            and '.method public final a(Z)V' in path.read_text(encoding='utf-8', errors='ignore')
+        ),
+        None,
     )
-    new = (
-        '    nop\n'
-        '\n'
-        '    .line 14\n'
-        '    .line 15\n'
-        '    sget-object v3, Lcom/oplus/aiunit/vision/we1;->a:Lcom/oplus/aiunit/vision/we1;\n'
+    if smali is None:
+        raise ValueError('OppoGallery2 GCloudPageHelper verification listener not found')
+    data = smali.read_text(encoding='utf-8')
+    method = re.search(
+        r'(?ms)^\.method public final a\(Z\)V\n.*?^\.end method',
+        data,
     )
-    fixed = data.replace(old, new, 1)
-    if fixed != data:
-        smali.write_text(fixed, encoding='utf-8')
-    elif '    nop\n\n    .line 14\n    .line 15\n    sget-object v3, Lcom/oplus/aiunit/vision/we1;->a:Lcom/oplus/aiunit/vision/we1;\n' not in data:
-        return
+    if method is None or 'Lcom/oplus/aiunit/vision/mlf;->e:' not in method.group(0):
+        raise ValueError('OppoGallery2 GCloudPageHelper callback method not found')
+    fixed_method, count = re.subn(
+        r'    if-eqz p1, :(?P<label>cond_[0-9a-f]+)\n',
+        '    nop\n',
+        method.group(0),
+        count=1,
+    )
+    if count != 1 and '    nop\n' not in method.group(0):
+        raise ValueError('OppoGallery2 GCloudPageHelper verify-result branch not found')
+    smali.write_text(data[:method.start()] + fixed_method + data[method.end():], encoding='utf-8')
 
 
 def blob_fixup_oppogallery_google_photos_launch_consent_after_verify_failure(ctx, file, file_path, *args, tmp_dir=None, **kwargs):
     if tmp_dir is None:
         return
 
-    smali = Path(tmp_dir) / 'smali_classes8/com/oplus/gallery/framework/abilities/gcloudsync/GCloudSyncStatusManager$c.smali'
-    if not smali.exists():
-        return
-
+    smali = next(
+        (
+            path
+            for path in Path(tmp_dir).glob(
+                'smali*/com/oplus/gallery/framework/abilities/gcloudsync/GCloudSyncStatusManager$*.smali'
+            )
+            if 'verifyAppState failure. e:' in path.read_text(encoding='utf-8', errors='ignore')
+            and 'GooglePhotosBackupApiClient;->verifyAppState' in path.read_text(encoding='utf-8', errors='ignore')
+        ),
+        None,
+    )
+    if smali is None:
+        raise ValueError('OppoGallery2 verifyAppState coroutine not found')
     data = smali.read_text(encoding='utf-8')
+    data = data.replace(
+        '.method public final invokeSuspend(Ljava/lang/Object;)Ljava/lang/Object;\n'
+        '    .locals 5\n',
+        '.method public final invokeSuspend(Ljava/lang/Object;)Ljava/lang/Object;\n'
+        '    .locals 8\n',
+        1,
+    )
     marker = re.compile(
-        r'(    invoke-static \{v0, v1, p0\}, Lcom/oplus/aiunit/vision/ro8;->q\(Ljava/lang/String;Ljava/lang/String;Ljava/lang/Throwable;\)V\n'
+        r'(    invoke-static \{v0, v1, p0\}, Lcom/oplus/aiunit/vision/btf;->m\(Ljava/lang/String;Ljava/lang/String;Ljava/lang/Throwable;\)V\n'
         r'(?:\n|    \.line \d+\n)*)'
         r'(    :cond_[0-9a-f]+\n)'
     )
     insert = (
         r'\1'
-        '    sget-object v2, Lcom/oplus/aiunit/vision/we1;->a:Lcom/oplus/aiunit/vision/we1;\n'
+        '    sget-object v2, Lcom/oplus/aiunit/vision/dk3;->a:Lcom/oplus/aiunit/vision/dk3;\n'
         '\n'
         '    invoke-static {}, Lkotlinx/coroutines/Dispatchers;->getIO()Lkotlinx/coroutines/CoroutineDispatcher;\n'
         '\n'
@@ -1082,11 +1140,11 @@ def blob_fixup_oppogallery_google_photos_launch_consent_after_verify_failure(ctx
         '\n'
         '    const/4 v4, 0x0\n'
         '\n'
-        '    new-instance v5, Lcom/oplus/aiunit/vision/ej8;\n'
+        '    new-instance v5, Lcom/oplus/aiunit/vision/fnf;\n'
         '\n'
         '    sget-object v1, Lcom/oplus/gallery/business_lib/cloudsync/EntryPoint;->SETTINGS:Lcom/oplus/gallery/business_lib/cloudsync/EntryPoint;\n'
         '\n'
-        '    invoke-direct {v5, v1, v4}, Lcom/oplus/aiunit/vision/ej8;-><init>(Lcom/oplus/gallery/business_lib/cloudsync/EntryPoint;Lkotlin/coroutines/Continuation;)V\n'
+        '    invoke-direct {v5, v1, v4}, Lcom/oplus/aiunit/vision/fnf;-><init>(Lcom/oplus/gallery/business_lib/cloudsync/EntryPoint;Lkotlin/coroutines/Continuation;)V\n'
         '\n'
         '    const/4 v6, 0x2\n'
         '\n'
@@ -1097,115 +1155,91 @@ def blob_fixup_oppogallery_google_photos_launch_consent_after_verify_failure(ctx
         r'\2'
     )
     fixed, count = marker.subn(insert, data, count=1)
-    if fixed != data:
-        smali.write_text(fixed, encoding='utf-8')
-    elif 'Lcom/oplus/gallery/business_lib/cloudsync/EntryPoint;->SETTINGS:Lcom/oplus/gallery/business_lib/cloudsync/EntryPoint;' not in data:
-        return
+    if count != 1 and 'new-instance v5, Lcom/oplus/aiunit/vision/fnf;' not in data:
+        raise ValueError('OppoGallery2 verifyAppState failure branch not found')
+    smali.write_text(fixed, encoding='utf-8')
 
 
 def blob_fixup_oppogallery_hide_google_photos_backup_settings(ctx, file, file_path, *args, tmp_dir=None, **kwargs):
     if tmp_dir is None:
         return
 
-    # Hide the photo-page overflow entry on newer Gallery builds. The older
-    # settings-only patch below does not catch this 16.0.8 menu path.
-    smali = Path(tmp_dir) / 'smali_classes10/com/oplus/aiunit/vision/g0i.smali'
-    if smali.exists():
-        data = smali.read_text(encoding='utf-8')
-        marker = (
-            '    sget v1, Lcom/oplus/gallery/photo_page/R$id;->action_backup_to_cloud:I\n'
-            '\n'
-            '    .line 532\n'
-            '    .line 533\n'
-            '    const-wide/high16 v3, 0x4000000000000000L    # 2.0\n'
-            '\n'
-            '    .line 534\n'
-            '    .line 535\n'
-            '    const-string v2, "action_backup_to_cloud"\n'
-            '\n'
-            '    .line 536\n'
-            '    .line 537\n'
-            '    invoke-static/range {v0 .. v6}, Lcom/oplus/aiunit/vision/g0i;->a(Ljava/util/LinkedHashMap;ILjava/lang/String;JZZ)V\n'
-        )
-        replacement = (
-            marker +
-            '\n'
-            '    sget v1, Lcom/oplus/gallery/photo_page/R$id;->action_backup_to_cloud:I\n'
-            '\n'
-            '    invoke-static {v1}, Ljava/lang/Integer;->valueOf(I)Ljava/lang/Integer;\n'
-            '\n'
-            '    move-result-object v1\n'
-            '\n'
-            '    invoke-virtual {v0, v1}, Ljava/util/LinkedHashMap;->remove(Ljava/lang/Object;)Ljava/lang/Object;\n'
-        )
-        if marker in data and 'LinkedHashMap;->remove(Ljava/lang/Object;)Ljava/lang/Object;' not in data:
-            smali.write_text(data.replace(marker, replacement, 1), encoding='utf-8')
+    # Remove the photo-page backup action from the current action-definition
+    # map. The concrete h0u rule still exists, but without this map entry it is
+    # never exposed by the overflow menu.
+    menu_map = next(
+        (
+            path
+            for path in Path(tmp_dir).glob('smali*/com/oplus/aiunit/vision/*.smali')
+            if '"action_backup_to_cloud"' in path.read_text(encoding='utf-8', errors='ignore')
+            and 'Ljava/util/LinkedHashMap;' in path.read_text(encoding='utf-8', errors='ignore')
+            and '0x4000000000000000L' in path.read_text(encoding='utf-8', errors='ignore')
+        ),
+        None,
+    )
+    if menu_map is None:
+        raise ValueError('OppoGallery2 backup-to-cloud menu map not found')
+    data = menu_map.read_text(encoding='utf-8')
+    pattern = re.compile(
+        r'(?P<entry>'
+        r'    sget (?P<id>v\d+), Lcom/oplus/gallery/photo_page/R\$id;->action_backup_to_cloud:I\n'
+        r'.*?'
+        r'    const-string (?P<name>v\d+), "action_backup_to_cloud"\n'
+        r'.*?'
+        r'    invoke-static/range \{v0 \.\. v6\}, L(?P<owner>[^;]+);->a\(Ljava/util/LinkedHashMap;ILjava/lang/String;JZZ\)V\n'
+        r')',
+        re.DOTALL,
+    )
 
-    smali = Path(tmp_dir) / 'smali_classes10/com/oplus/aiunit/vision/urh.smali'
-    if smali.exists():
-        data = smali.read_text(encoding='utf-8')
-        if '.method public m()Z' not in data:
-            insert = (
-                '\n'
-                '.method public m()Z\n'
-                '    .locals 1\n'
-                '\n'
-                '    const/4 v0, 0x0\n'
-                '\n'
-                '    return v0\n'
-                '.end method\n'
-            )
-            data = data.replace('\n.method public n(Lcom/oplus/gallery/foundation/uikit/responsiveui/AppUiResponder$a;)V', insert + '\n.method public n(Lcom/oplus/gallery/foundation/uikit/responsiveui/AppUiResponder$a;)V', 1)
-            smali.write_text(data, encoding='utf-8')
+    def remove_backup_action(match: re.Match) -> str:
+        return (
+            match.group('entry')
+            + '\n'
+            + f'    sget {match.group("id")}, Lcom/oplus/gallery/photo_page/R$id;->action_backup_to_cloud:I\n'
+            + '\n'
+            + f'    invoke-static {{{match.group("id")}}}, Ljava/lang/Integer;->valueOf(I)Ljava/lang/Integer;\n'
+            + '\n'
+            + f'    move-result-object {match.group("id")}\n'
+            + '\n'
+            + f'    invoke-virtual {{v0, {match.group("id")}}}, Ljava/util/LinkedHashMap;->remove(Ljava/lang/Object;)Ljava/lang/Object;\n'
+        )
 
-    for smali in glob.glob(str(Path(tmp_dir) / 'smali*/com/oplus/gallery/settingpage/SettingsActivity$SettingFragment.smali')):
-        data = Path(smali).read_text(encoding='utf-8')
-        if ':oplus_hide_google_photos_backup_settings_done' in data:
-            return
-        marker = re.search(
-            r'(?ms)^(    :cond_1\n'
-            r'    :goto_0\n'
-            r'    iget-object v0, v1, Lcom/oplus/gallery/settingpage/SettingsActivity\$SettingFragment;->[a-zA-Z0-9]+:Landroidx/preference/PreferenceScreen;\n'
-            r'\n'
-            r'    \.line \d+\n'
-            r'    \.line \d+\n'
-            r'    const-string v3, "pref_category_key_sending"\n)',
-            data,
-        )
-        if not marker:
-            continue
-        screen_load = re.search(
-            r'    iget-object v0, v1, Lcom/oplus/gallery/settingpage/SettingsActivity\$SettingFragment;->[a-zA-Z0-9]+:Landroidx/preference/PreferenceScreen;\n',
-            marker.group(1),
-        ).group(0)
-        insert = (
-            marker.group(1).replace('    const-string v3, "pref_category_key_sending"\n', '')
-            + '    if-eqz v0, :oplus_hide_google_photos_backup_settings_done\n'
-            + '\n'
-            + '    const-string v3, "pref_category_key_cloud_sync"\n'
-            + '\n'
-            + '    invoke-virtual {v0, v3}, Landroidx/preference/PreferenceGroup;->removePreferenceRecursively(Ljava/lang/CharSequence;)Z\n'
-            + '\n'
-            + '    const-string v3, "pref_category_cloud_sync_key"\n'
-            + '\n'
-            + '    invoke-virtual {v0, v3}, Landroidx/preference/PreferenceGroup;->removePreferenceRecursively(Ljava/lang/CharSequence;)Z\n'
-            + '\n'
-            + '    const-string v3, "pref_key_auto_sync_2"\n'
-            + '\n'
-            + '    invoke-virtual {v0, v3}, Landroidx/preference/PreferenceGroup;->removePreferenceRecursively(Ljava/lang/CharSequence;)Z\n'
-            + '\n'
-            + '    const-string v3, "pref_category_key_cloud_storage_space"\n'
-            + '\n'
-            + '    invoke-virtual {v0, v3}, Landroidx/preference/PreferenceGroup;->removePreferenceRecursively(Ljava/lang/CharSequence;)Z\n'
-            + '\n'
-            + '    :oplus_hide_google_photos_backup_settings_done\n'
-            + screen_load
-            + '\n'
-            + '    const-string v3, "pref_category_key_sending"\n'
-        )
-        fixed = data[:marker.start()] + insert + data[marker.end():]
-        Path(smali).write_text(fixed, encoding='utf-8')
-        return
+    fixed, count = pattern.subn(remove_backup_action, data, count=1)
+    if count != 1 and 'action_backup_to_cloud' in data and 'LinkedHashMap;->remove' not in data:
+        raise ValueError('OppoGallery2 backup-to-cloud menu entry not patched')
+    menu_map.write_text(fixed, encoding='utf-8')
+
+    # The 16.0.9.403 Settings screen places the Google Photos entry under one
+    # category. Remove that category immediately after inflating the screen;
+    # s1() already handles the resulting missing child preference.
+    settings = _find_smali(
+        tmp_dir,
+        'com/oplus/gallery/settingpage/SettingsActivity$SettingFragment.smali',
+        'OppoGallery2 Settings fragment',
+    )
+    data = settings.read_text(encoding='utf-8')
+    old = (
+        '    iput-object p1, p0, Lcom/oplus/gallery/settingpage/SettingsActivity$SettingFragment;->l:Landroidx/preference/PreferenceScreen;\n'
+        '\n'
+        '    if-nez p1, :cond_0\n'
+    )
+    new = (
+        '    iput-object p1, p0, Lcom/oplus/gallery/settingpage/SettingsActivity$SettingFragment;->l:Landroidx/preference/PreferenceScreen;\n'
+        '\n'
+        '    if-eqz p1, :oplus_hide_google_photos_backup_settings_done\n'
+        '\n'
+        '    const-string v0, "pref_category_cloud_sync_key"\n'
+        '\n'
+        '    invoke-virtual {p1, v0}, Landroidx/preference/PreferenceGroup;->removePreferenceRecursively(Ljava/lang/CharSequence;)Z\n'
+        '\n'
+        '    :oplus_hide_google_photos_backup_settings_done\n'
+        '\n'
+        '    if-nez p1, :cond_0\n'
+    )
+    fixed = data.replace(old, new, 1)
+    if fixed == data and ':oplus_hide_google_photos_backup_settings_done' not in data:
+        raise ValueError('OppoGallery2 Google Photos Settings category patch point not found')
+    settings.write_text(fixed, encoding='utf-8')
 
 
 def blob_fixup_stdid_receiver_flags(ctx, file, file_path, *args, tmp_dir=None, **kwargs):
@@ -1272,48 +1306,37 @@ def blob_fixup_oppogallery_system_share_helper(ctx, file, file_path, *args, tmp_
     if tmp_dir is None:
         return
 
-    smali = Path(tmp_dir) / 'smali_classes8' / 'com' / 'oplus' / 'aiunit' / 'vision' / 'x7m.smali'
-    if not smali.exists():
+    smali = next(
+        (
+            path
+            for path in Path(tmp_dir).glob('smali*/com/oplus/aiunit/vision/*.smali')
+            if '.source "ShareHelper.kt"' in path.read_text(encoding='utf-8', errors='ignore')
+            and 'feature_is_support_user_custom_gallery_share' in path.read_text(encoding='utf-8', errors='ignore')
+        ),
+        None,
+    )
+    if smali is None:
         raise ValueError('OppoGallery2 ShareHelper smali not found')
 
     data = smali.read_text(encoding='utf-8', errors='ignore')
-    old = (
-        '    sget-object v2, Lcom/oplus/aiunit/vision/ci8;->m0:Lkotlin/Lazy;\n'
-        '\n'
-        '    .line 40\n'
-        '    .line 41\n'
-        '    invoke-interface {v2}, Lkotlin/Lazy;->getValue()Ljava/lang/Object;\n'
-        '\n'
-        '    .line 42\n'
-        '    .line 43\n'
-        '    .line 44\n'
-        '    move-result-object v2\n'
-        '\n'
-        '    .line 45\n'
-        '    check-cast v2, Ljava/lang/Boolean;\n'
-        '\n'
-        '    .line 46\n'
-        '    .line 47\n'
-        '    invoke-virtual {v2}, Ljava/lang/Boolean;->booleanValue()Z\n'
-        '\n'
-        '    .line 48\n'
-        '    .line 49\n'
-        '    .line 50\n'
-        '    move-result v2\n'
-        '\n'
-        '    .line 51\n'
-        '    const/4 v3, 0x0\n'
-        '\n'
-        '    .line 52\n'
-        '    if-nez v2, :cond_2\n'
+    # The feature gate above this block remains intact. Only bypass the
+    # product flag that chooses Oplus's private share page, entering the
+    # existing Android chooser branch at cond_2 instead.
+    branch = re.compile(
+        r'    sget-object v2, Lcom/oplus/aiunit/vision/hke;->m0:Lkotlin/Lazy;\n'
+        r'.*?'
+        r'    const/4 v3, 0x0\n'
+        r'(?:\n|    \.line \d+\n)*'
+        r'    if-nez v2, :cond_2\n',
+        re.DOTALL,
     )
     new = (
         '    const/4 v3, 0x0\n'
         '\n'
         '    goto :cond_2\n'
     )
-    fixed = data.replace(old, new, 1)
-    if fixed == data:
+    fixed, count = branch.subn(new, data, count=1)
+    if count != 1:
         raise ValueError('OppoGallery2 ShareHelper system-share patch point not found')
 
     uri_body = (
@@ -1323,17 +1346,17 @@ def blob_fixup_oppogallery_system_share_helper(ctx, file, file_path, *args, tmp_
         '\n'
         '    invoke-static {p0, v0}, Lkotlin/jvm/internal/Intrinsics;->checkNotNullParameter(Ljava/lang/Object;Ljava/lang/String;)V\n'
         '\n'
-        '    invoke-virtual {p0}, Lcom/oplus/aiunit/vision/rfg;->f()Lcom/oplus/gallery/business_lib/model/data/base/MediaObject;\n'
+        '    invoke-virtual {p0}, Lcom/oplus/aiunit/vision/vmr;->f()Lcom/oplus/gallery/business_lib/model/data/base/MediaObject;\n'
         '\n'
         '    move-result-object v0\n'
         '\n'
-        '    instance-of v1, v0, Lcom/oplus/aiunit/vision/ymd;\n'
+        '    instance-of v1, v0, Lcom/oplus/aiunit/vision/qkm;\n'
         '\n'
         '    if-eqz v1, :cond_fallback\n'
         '\n'
-        '    check-cast v0, Lcom/oplus/aiunit/vision/ymd;\n'
+        '    check-cast v0, Lcom/oplus/aiunit/vision/qkm;\n'
         '\n'
-        '    invoke-virtual {v0}, Lcom/oplus/aiunit/vision/ymd;->x()Ljava/lang/String;\n'
+        '    invoke-virtual {v0}, Lcom/oplus/aiunit/vision/qkm;->x()Ljava/lang/String;\n'
         '\n'
         '    move-result-object v0\n'
         '\n'
@@ -1345,26 +1368,26 @@ def blob_fixup_oppogallery_system_share_helper(ctx, file, file_path, *args, tmp_
         '\n'
         '    if-lez v1, :cond_fallback\n'
         '\n'
-        '    sget-object v1, Lcom/oplus/aiunit/vision/s55;->a:Landroid/content/Context;\n'
+        '    sget-object v1, Lcom/oplus/aiunit/vision/i79;->a:Lcom/coloros/gallery3d/app/App;\n'
         '\n'
         '    if-eqz v1, :cond_fallback\n'
         '\n'
-        '    new-instance v2, Lcom/oplus/aiunit/vision/mj8;\n'
+        '    new-instance v2, Lcom/oplus/aiunit/vision/dre;\n'
         '\n'
-        '    invoke-direct {v2, v0}, Lcom/oplus/aiunit/vision/mj8;-><init>(Ljava/lang/String;)V\n'
+        '    invoke-direct {v2, v0}, Lcom/oplus/aiunit/vision/dre;-><init>(Ljava/lang/String;)V\n'
         '\n'
         '    const/4 v0, 0x0\n'
         '\n'
         '    new-array v0, v0, [Ljava/lang/String;\n'
         '\n'
-        '    invoke-static {v1, v2, v0}, Lcom/oplus/gallery/foundation/fileaccess/GalleryFileProvider$a;->e(Landroid/content/Context;Lcom/oplus/aiunit/vision/mj8;[Ljava/lang/String;)Landroid/net/Uri;\n'
+        '    invoke-static {v1, v2, v0}, Lcom/oplus/gallery/foundation/fileaccess/GalleryFileProvider$a;->e(Landroid/content/Context;Lcom/oplus/aiunit/vision/dre;[Ljava/lang/String;)Landroid/net/Uri;\n'
         '\n'
         '    move-result-object v0\n'
         '\n'
         '    return-object v0\n'
         '\n'
         '    :cond_fallback\n'
-        '    invoke-static {p0}, Lcom/oplus/aiunit/vision/rkp;->i(Lcom/oplus/aiunit/vision/rfg;)Z\n'
+        '    invoke-static {p0}, Lcom/oplus/aiunit/vision/lz60;->i(Lcom/oplus/aiunit/vision/vmr;)Z\n'
         '\n'
         '    move-result v0\n'
         '\n'
@@ -1372,28 +1395,28 @@ def blob_fixup_oppogallery_system_share_helper(ctx, file, file_path, *args, tmp_
         '\n'
         '    if-eqz v0, :cond_0\n'
         '\n'
-        '    iget-object p0, p0, Lcom/oplus/aiunit/vision/rfg;->b:Ljava/lang/String;\n'
+        '    iget-object p0, p0, Lcom/oplus/aiunit/vision/vmr;->b:Ljava/lang/String;\n'
         '\n'
         '    const/4 v0, 0x1\n'
         '\n'
-        '    invoke-static {v0, p0, v1}, Lcom/oplus/aiunit/vision/ipd;->i(ILjava/lang/String;Ljava/lang/String;)Landroid/net/Uri;\n'
+        '    invoke-static {v0, p0, v1}, Lcom/oplus/aiunit/vision/jom;->i(ILjava/lang/String;Ljava/lang/String;)Landroid/net/Uri;\n'
         '\n'
         '    move-result-object p0\n'
         '\n'
         '    goto :goto_0\n'
         '\n'
         '    :cond_0\n'
-        '    invoke-static {p0}, Lcom/oplus/aiunit/vision/rkp;->j(Lcom/oplus/aiunit/vision/rfg;)Z\n'
+        '    invoke-static {p0}, Lcom/oplus/aiunit/vision/lz60;->j(Lcom/oplus/aiunit/vision/vmr;)Z\n'
         '\n'
         '    move-result v0\n'
         '\n'
         '    if-eqz v0, :cond_1\n'
         '\n'
-        '    iget-object p0, p0, Lcom/oplus/aiunit/vision/rfg;->b:Ljava/lang/String;\n'
+        '    iget-object p0, p0, Lcom/oplus/aiunit/vision/vmr;->b:Ljava/lang/String;\n'
         '\n'
         '    const/4 v0, 0x3\n'
         '\n'
-        '    invoke-static {v0, p0, v1}, Lcom/oplus/aiunit/vision/ipd;->i(ILjava/lang/String;Ljava/lang/String;)Landroid/net/Uri;\n'
+        '    invoke-static {v0, p0, v1}, Lcom/oplus/aiunit/vision/jom;->i(ILjava/lang/String;Ljava/lang/String;)Landroid/net/Uri;\n'
         '\n'
         '    move-result-object p0\n'
         '\n'
@@ -1408,7 +1431,7 @@ def blob_fixup_oppogallery_system_share_helper(ctx, file, file_path, *args, tmp_
     before_uri = fixed
     fixed = _replace_smali_method(
         fixed,
-        'public static b(Lcom/oplus/aiunit/vision/rfg;)Landroid/net/Uri;',
+        'public static b(Lcom/oplus/aiunit/vision/vmr;)Landroid/net/Uri;',
         uri_body,
     )
     if fixed == before_uri:
@@ -1416,23 +1439,12 @@ def blob_fixup_oppogallery_system_share_helper(ctx, file, file_path, *args, tmp_
     smali.write_text(fixed, encoding='utf-8')
 
 
-def blob_fixup_oppogallery_op15_native_libs(ctx, file, file_path, *args, tmp_dir=None, **kwargs):
+def blob_fixup_oppogallery_lighthouse_native_libs(ctx, file, file_path, *args, tmp_dir=None, **kwargs):
     if tmp_dir is None:
         return
 
     manifest = Path(tmp_dir) / 'AndroidManifest.xml'
     data = manifest.read_text(encoding='utf-8') if manifest.exists() else ''
-    old = [
-        '        <uses-native-library android:name="/odm/lib64/aiboost/libaiboost.so" android:required="false"/>\n',
-        '        <uses-native-library android:name="/odm/lib64/aiboost/libaiboost_qnn_external_delegate.so" android:required="false"/>\n',
-        '        <uses-native-library android:name="/odm/lib64/aiboost/libQnnHtp.so" android:required="false"/>\n',
-        '        <uses-native-library android:name="/odm/lib64/aiboost/libQnnHtpPrepare.so" android:required="false"/>\n',
-        '        <uses-native-library android:name="/odm/lib64/aiboost/libQnnHtpV75Stub.so" android:required="false"/>\n',
-        '        <uses-native-library android:name="/odm/lib64/aiboost/libQnnSystem.so" android:required="false"/>\n',
-        '        <uses-native-library android:name="/odm/lib64/aiboost/libtransformer_lite.so" android:required="false"/>\n',
-        '        <uses-native-library android:name="/odm/lib64/Skel_signed/aiboost/libQnnHtpV75Skel.so" android:required="false"/>\n',
-        '        <uses-native-library android:name="/odm/lib64/aiboost/Skel_unsigned/libQnnHtpV75Skel.so" android:required="false"/>\n',
-    ]
     new = [
         '        <uses-native-library android:name="/odm/lib64/libQnnHtp.so" android:required="false"/>\n',
         '        <uses-native-library android:name="/odm/lib64/libQnnHtpPrepare.so" android:required="false"/>\n',
@@ -1442,13 +1454,26 @@ def blob_fixup_oppogallery_op15_native_libs(ctx, file, file_path, *args, tmp_dir
         '        <uses-native-library android:name="/odm/lib64/libQnnSystem.so" android:required="false"/>\n',
     ]
 
-    fixed = data
-    anchor = ''.join(line for line in old if line in fixed)
-    if anchor:
-        fixed = fixed.replace(anchor, ''.join(new))
-    elif new[-1] not in fixed:
+    # The stock manifest carries duplicated references to a V75 aiboost
+    # directory that does not exist in the Lighthouse dump. Remove every
+    # member of that obsolete path family, including duplicates, and place the
+    # actual root-level V81 dependencies at the first old entry's position.
+    obsolete = re.compile(
+        r'        <uses-native-library android:name="/odm/lib64/'
+        r'(?:aiboost/|Skel_signed/aiboost/)[^"]+" android:required="false"/>\n'
+    )
+    matches = list(obsolete.finditer(data))
+    if matches:
+        insert_at = matches[0].start()
+        fixed = obsolete.sub('', data)
+        fixed = fixed[:insert_at] + ''.join(new) + fixed[insert_at:]
+    elif new[-1] in data:
+        fixed = data
+    else:
         insert_after = '        <uses-native-library android:name="libOpenCL.so" android:required="true"/>\n'
-        fixed = fixed.replace(insert_after, insert_after + ''.join(new))
+        fixed = data.replace(insert_after, insert_after + ''.join(new), 1)
+        if fixed == data:
+            raise ValueError('OppoGallery2 native-library insertion point not found')
 
     if fixed != data:
         manifest.write_text(fixed, encoding='utf-8')
@@ -2329,8 +2354,10 @@ def blob_fixup_melody_repackaging_detector(ctx, file, file_path, *args, tmp_dir=
     # is encrypted with AES-256-GCM using the SHA-256 hash of the OEM signing certificate.
     # When the APK is re-signed with ROM platform/test keys, RepackagingDetector returns the
     # hash of the new key, causing decryption to fail and resulting in an empty device feature list.
-    # We patch RepackagingDetector.b() / c() to always return the original stock certificate hash,
-    # and d() (LSPatch check) to return false.
+    # ColorOS 16.0.9.403 resolves the hash through b(Context), with c(Context)
+    # reading the APK signature, d(Context) querying PackageManager, and
+    # e(Context) detecting LSPatch. Return the verified stock certificate hash
+    # from every hash path and make only the LSPatch predicate false.
     key_body = (
         '    .locals 1\n'
         '\n'
@@ -2386,14 +2413,35 @@ def blob_fixup_melody_repackaging_detector(ctx, file, file_path, *args, tmp_dir=
         '    return v0\n'
     )
 
-    for smali in Path(tmp_dir).glob('smali*/**/L.smali'):
-        data = smali.read_text(encoding='utf-8')
-        if 'RepackagingDetector' not in data:
-            continue
-        data = _replace_smali_method(data, 'public static b(Lcom/oplus/melody/MelodyApplication;)[B', key_body)
-        data = _replace_smali_method(data, 'public static c(Lcom/oplus/melody/MelodyApplication;)[B', key_body)
-        data = _replace_smali_method(data, 'public static d(Lcom/oplus/melody/MelodyApplication;)Z', lspatch_body)
-        smali.write_text(data, encoding='utf-8')
+    smali = next(
+        (
+            path
+            for path in Path(tmp_dir).glob('smali*/**/*.smali')
+            if '.source "RepackagingDetector.java"' in path.read_text(encoding='utf-8', errors='ignore')
+            and 'getCurrentSignatureHash' in path.read_text(encoding='utf-8', errors='ignore')
+            and 'LSPatch detected in assets directory!' in path.read_text(encoding='utf-8', errors='ignore')
+        ),
+        None,
+    )
+    if smali is None:
+        raise ValueError('Melody RepackagingDetector not found')
+
+    data = smali.read_text(encoding='utf-8')
+    fixed = data
+    for method in ('b', 'c', 'd'):
+        fixed = _replace_smali_method(
+            fixed,
+            f'public static {method}(Landroid/content/Context;)[B',
+            key_body,
+        )
+    fixed = _replace_smali_method(
+        fixed,
+        'public static e(Landroid/content/Context;)Z',
+        lspatch_body,
+    )
+    if fixed == data:
+        raise ValueError('Melody RepackagingDetector methods not patched')
+    smali.write_text(fixed, encoding='utf-8')
 
 
 def blob_fixup_oplus_camera_framework_shims(ctx, file, file_path, *args, tmp_dir=None, **kwargs):
@@ -5793,13 +5841,34 @@ lib_fixups: lib_fixups_user_type = {
 def blob_fixup_filemanager_cut_skip_k0_when_same_disk(ctx, file, file_path, *args, tmp_dir=None, **kwargs):
     if tmp_dir is None:
         return
-    smali = Path(tmp_dir) / 'smali' / 'com' / 'filemanager' / 'fileoperate' / 'cut' / 'FileActionCut.smali'
+    smali = _find_smali(
+        tmp_dir,
+        'com/filemanager/fileoperate/cut/FileActionCut.smali',
+        'FileManager FileActionCut',
+    )
     data = smali.read_text(encoding='utf-8')
     # K0() checks whether a cross-device move dialog is needed, but on LineageOS
     # it crashes silently (swallowed by the thread pool) before logging anything.
-    # V:Z is already set true in V() when source and dest are on the same volume,
+    # The boolean populated from cut/g.j() in V() is true when source and
+    # destination are on the same volume,
     # so skipping K0() for same-disk moves is correct — no cross-device dialog needed.
-    if 'iget-boolean v2, p0, Lcom/filemanager/fileoperate/cut/FileActionCut;->V:Z' in data:
+    field_match = re.search(
+        r'invoke-virtual \{[^}]+\}, Lcom/filemanager/fileoperate/cut/g;->j\(Ljava/util/List;Ljava/lang/String;\)Z\n'
+        r'\n'
+        r'    move-result (?P<register>[vp]\d+)\n'
+        r'.*?'
+        r'    iput-boolean (?P=register), p0, Lcom/filemanager/fileoperate/cut/FileActionCut;->(?P<field>[A-Za-z0-9_$]+):Z',
+        data,
+        re.DOTALL,
+    )
+    if field_match is None:
+        raise ValueError('FileManager same-volume state field not found in V()')
+    same_volume_field = field_match.group('field')
+    marker = (
+        f'iget-boolean v2, p0, '
+        f'Lcom/filemanager/fileoperate/cut/FileActionCut;->{same_volume_field}:Z'
+    )
+    if marker in data:
         return
     pattern = (
         r'(?m)^(?P<label>    :cond_\w+\n)'
@@ -5813,7 +5882,7 @@ def blob_fixup_filemanager_cut_skip_k0_when_same_disk(ctx, file, file_path, *arg
     def skip_same_disk(match: re.Match) -> str:
         return (
             match.group('label')
-            + '    iget-boolean v2, p0, Lcom/filemanager/fileoperate/cut/FileActionCut;->V:Z\n'
+            + f'    iget-boolean v2, p0, Lcom/filemanager/fileoperate/cut/FileActionCut;->{same_volume_field}:Z\n'
             + f'    if-nez v2, :{match.group("after")}\n'
             + match.group('call')
         )
@@ -5827,7 +5896,11 @@ def blob_fixup_filemanager_cut_skip_k0_when_same_disk(ctx, file, file_path, *arg
 def blob_fixup_filemanager_select_dir_current_path_fallback(ctx, file, file_path, *args, tmp_dir=None, **kwargs):
     if tmp_dir is None:
         return
-    smali = Path(tmp_dir) / 'smali_classes3' / 'com' / 'oplus' / 'selectdir' / 'SelectDirPathPanelFragment.smali'
+    smali = _find_smali(
+        tmp_dir,
+        'com/oplus/selectdir/SelectDirPathPanelFragment.smali',
+        'FileManager select-directory panel',
+    )
     data = smali.read_text(encoding='utf-8')
     log_anchor = '    const-string v4, "selectButton click -> select path:"\n'
     button_anchor = '    iget-object p1, p0, Lcom/oplus/selectdir/SelectDirPathPanelFragment;->mSelectButton:Lcom/coui/appcompat/button/COUIButton;\n'
@@ -5882,20 +5955,24 @@ def blob_fixup_filemanager_copycut_skip_osense_scene(ctx, file, file_path, *args
 def blob_fixup_filemanager_superapp_zip_preview(ctx, file, file_path, *args, tmp_dir=None, **kwargs):
     if tmp_dir is None:
         return
-    smali = Path(tmp_dir) / 'smali' / 'com' / 'filemanager' / 'superapp' / 'ui' / 'superapp' / 'SuperListFragment$n.smali'
+    smali = _find_smali(
+        tmp_dir,
+        'com/filemanager/superapp/ui/superapp/SuperListFragment$n.smali',
+        'FileManager SuperListFragment archive click handler',
+    )
     data = smali.read_text(encoding='utf-8')
     if 'SuperApp archive preview direct' in data:
         return
     anchor = (
         '    :cond_2\n'
-        '    invoke-static {p1}, Lkotlin/a;->b(Ljava/lang/Object;)V\n'
+        '    invoke-static {p1}, Lkotlin/b;->b(Ljava/lang/Object;)V\n'
         '\n'
     )
     insert = (
         anchor +
         '    iget-object p1, p0, Lcom/filemanager/superapp/ui/superapp/SuperListFragment$n;->i:Lcom/filemanager/common/base/c;\n'
         '\n'
-        '    invoke-virtual {p1}, Lcom/filemanager/common/base/c;->t()I\n'
+        '    invoke-virtual {p1}, Lcom/filemanager/common/base/c;->v()I\n'
         '\n'
         '    move-result p1\n'
         '\n'
@@ -5909,7 +5986,7 @@ def blob_fixup_filemanager_superapp_zip_preview(ctx, file, file_path, *args, tmp
         '\n'
         '    invoke-static {p1, v1}, Lcom/filemanager/common/utils/g2;->b(Ljava/lang/String;Ljava/lang/String;)V\n'
         '\n'
-        '    sget-object p1, Le8/a;->a:Le8/a;\n'
+        '    sget-object p1, Lga/a;->a:Lga/a;\n'
         '\n'
         '    iget-object v1, p0, Lcom/filemanager/superapp/ui/superapp/SuperListFragment$n;->l:Landroidx/fragment/app/FragmentActivity;\n'
         '\n'
@@ -5917,9 +5994,9 @@ def blob_fixup_filemanager_superapp_zip_preview(ctx, file, file_path, *args, tmp
         '\n'
         '    const/high16 v3, 0x18000000\n'
         '\n'
-        '    invoke-virtual {p1, v1, v2, v3}, Le8/a;->h(Landroid/app/Activity;Lcom/filemanager/common/base/c;I)V\n'
+        '    invoke-virtual {p1, v1, v2, v3}, Lga/a;->Q0(Landroid/app/Activity;Lcom/filemanager/common/base/c;I)V\n'
         '\n'
-        '    sget-object p0, Lht/m;->a:Lht/m;\n'
+        '    sget-object p0, Le00/x;->a:Le00/x;\n'
         '\n'
         '    return-object p0\n'
         '\n'
@@ -5962,15 +6039,33 @@ def blob_fixup_filemanager_skip_osense_scene_actions(ctx, file, file_path, *args
 def blob_fixup_filemanager_safecheck_direct(ctx, file, file_path, *args, tmp_dir=None, **kwargs):
     if tmp_dir is None:
         return
-    smali = Path(tmp_dir) / 'smali' / 'com' / 'filemanager' / 'common' / 'fileutils' / 'e.smali'
+    smali = next(
+        (
+            path
+            for path in Path(tmp_dir).glob('smali*/com/filemanager/common/fileutils/*.smali')
+            if '"JavaFileHelper"' in path.read_text(encoding='utf-8', errors='ignore')
+            and '"safeCheck start"' in path.read_text(encoding='utf-8', errors='ignore')
+        ),
+        None,
+    )
+    if smali is None:
+        raise ValueError('FileManager JavaFileHelper.safeCheck class not found')
     data = smali.read_text(encoding='utf-8')
-    signature = 'public final x(Lvt/a;Ljava/lang/Object;)Ljava/lang/Object;'
+    signature_match = re.search(
+        r'^\.method (?P<signature>public final [A-Za-z0-9_$]+\((?P<function>L[^;]+;)Ljava/lang/Object;\)Ljava/lang/Object;)$',
+        data,
+        re.MULTILINE,
+    )
+    if signature_match is None:
+        raise ValueError('FileManager JavaFileHelper.safeCheck signature not found')
+    signature = signature_match.group('signature')
+    function_type = signature_match.group('function')
     body = (
         '    .locals 3\n'
         '\n'
         '    const-string p0, "method"\n'
         '\n'
-        '    invoke-static {p1, p0}, Lkotlin/jvm/internal/j;->g(Ljava/lang/Object;Ljava/lang/String;)V\n'
+        '    invoke-static {p1, p0}, Lkotlin/jvm/internal/p;->h(Ljava/lang/Object;Ljava/lang/String;)V\n'
         '\n'
         '    const-string p0, "safeCheck direct"\n'
         '\n'
@@ -5979,7 +6074,7 @@ def blob_fixup_filemanager_safecheck_direct(ctx, file, file_path, *args, tmp_dir
         '    invoke-static {v0, p0}, Lcom/filemanager/common/utils/g2;->b(Ljava/lang/String;Ljava/lang/String;)V\n'
         '\n'
         '    :try_start_0\n'
-        '    invoke-interface {p1}, Lvt/a;->invoke()Ljava/lang/Object;\n'
+        f'    invoke-interface {{p1}}, {function_type}->invoke()Ljava/lang/Object;\n'
         '\n'
         '    move-result-object p0\n'
         '    :try_end_0\n'
@@ -6043,13 +6138,12 @@ blob_fixups: blob_fixups_user_type = {
     'system_ext/app/SystemUIPlugin/SystemUIPlugin.apk': blob_fixup()
         .call(blob_fixup_apktool_unpack_full)
         .call(blob_fixup_oplus_camera_system_properties)
-        .call(blob_fixup_systemuiplugin_plugin_context_inflater)
         .apktool_pack()
         .stripzip(),
     'system_ext/priv-app/OppoGallery2/OppoGallery2.apk': blob_fixup()
         .call(blob_fixup_apktool_unpack_full)
         .call(blob_fixup_opluscamera_uses_library)
-        .call(blob_fixup_oppogallery_op15_native_libs)
+        .call(blob_fixup_oppogallery_lighthouse_native_libs)
         .call(blob_fixup_oppogallery_receiver_flags)
         .call(blob_fixup_oppogallery_wallpaper_attach_intent)
         .call(blob_fixup_oppogallery_safe_box_custom_flag)
@@ -6105,9 +6199,7 @@ blob_fixups: blob_fixups_user_type = {
         .call(blob_fixup_filemanager_safecheck_direct)
         .call(blob_fixup_filemanager_select_dir_current_path_fallback)
         .call(blob_fixup_filemanager_cut_skip_k0_when_same_disk)
-        .call(blob_fixup_filemanager_copycut_skip_osense_scene)
         .call(blob_fixup_filemanager_superapp_zip_preview)
-        .call(blob_fixup_filemanager_skip_osense_scene_actions)
         .apktool_pack()
         .stripzip(),
     'system_ext/app/Melody/Melody.apk': blob_fixup()
