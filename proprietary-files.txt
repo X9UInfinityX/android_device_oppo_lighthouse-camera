@@ -317,6 +317,7 @@ system/lib64/vendor.oplus.hardware.cameraextension-V1-ndk.so
 system/lib64/vendor.oplus.hardware.sendextcamcmd-V2-ndk.so;MODULE_SUFFIX=_system
 vendor/lib64/vendor.oplus.hardware.sendextcamcmd-V2-ndk.so
 odm/lib64/hw/camera.oemlayer.v2.so
+odm/lib64/libsensorbridge.so
 system_ext/lib64/libbsproxy.so
 system_ext/lib64/liboplus-uah-client.so;MODULE_SUFFIX=_system_ext
 system_ext/lib64/libcsextimpl.so;DISABLE_CHECKELF
