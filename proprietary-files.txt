@@ -315,6 +315,7 @@ my_product/lib64/liblivephoto.frc.jni.so:system_ext/lib64/liblivephoto.frc.jni.s
 system/lib64/vendor.oplus.hardware.cameraextension@1.0.so
 system/lib64/vendor.oplus.hardware.cameraextension-V1-ndk.so
 system/lib64/vendor.oplus.hardware.sendextcamcmd-V2-ndk.so;MODULE_SUFFIX=_system
+vendor/lib64/vendor.oplus.hardware.sendextcamcmd-V2-ndk.so
 odm/lib64/hw/camera.oemlayer.v2.so
 system_ext/lib64/libbsproxy.so
 system_ext/lib64/liboplus-uah-client.so
