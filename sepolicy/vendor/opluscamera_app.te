@@ -32,7 +32,7 @@ dontaudit opluscamera_app vendor_xdsp_device:chr_file { getattr ioctl open read 
 
 # Text/OCR and night capture paths traverse /data/vendor/camera for OEM state.
 allow opluscamera_app vendor_camera_data_file:dir { add_name create getattr open read remove_name rmdir search write };
-allow opluscamera_app vendor_camera_data_file:file { create getattr open read rename unlink write };
+allow opluscamera_app vendor_camera_data_file:file { create getattr map open read rename unlink write };
 
 # Preview document probing traverses /data/local/tmp while preparing capture.
 allow opluscamera_app shell_data_file:dir search;
