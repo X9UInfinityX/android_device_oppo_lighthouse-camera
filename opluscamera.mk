@@ -30,7 +30,8 @@ PRODUCT_COPY_FILES += \
     $(OPLUS_CAMERA_PATH)/configs/permissions/oplus_google_lens_config.xml:$(TARGET_COPY_OUT_SYSTEM_EXT)/etc/permissions/oplus_google_lens_config.xml \
     $(OPLUS_CAMERA_PATH)/configs/permissions/privapp-permissions-oplus.xml:$(TARGET_COPY_OUT_SYSTEM_EXT)/etc/permissions/privapp-permissions-oplus.xml \
     $(OPLUS_CAMERA_PATH)/configs/framework/androidx.camera.extensions.impl.jar:$(TARGET_COPY_OUT_SYSTEM_EXT)/framework/androidx.camera.extensions.impl.jar \
-    $(OPLUS_CAMERA_PATH)/configs/sysconfig/hiddenapi-package-oplus-whitelist.xml:$(TARGET_COPY_OUT_SYSTEM)/etc/sysconfig/hiddenapi-package-oplus-whitelist.xml
+    $(OPLUS_CAMERA_PATH)/configs/sysconfig/hiddenapi-package-oplus-whitelist.xml:$(TARGET_COPY_OUT_SYSTEM)/etc/sysconfig/hiddenapi-package-oplus-whitelist.xml \
+    $(OPLUS_CAMERA_PATH)/configs/sysconfig/oplus-romupdate-component-overrides.xml:$(TARGET_COPY_OUT_PRODUCT)/etc/sysconfig/oplus-romupdate-component-overrides.xml
 
 # Gallery's ODNN retouch path dlopens QNN libraries by basename. Install the
 # Find X9 Ultra QNN runtime in system_ext and place real copies in Gallery's native lib dir.
