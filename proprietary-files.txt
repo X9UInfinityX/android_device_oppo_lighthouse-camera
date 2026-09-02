@@ -62,6 +62,8 @@ my_product/lib64/libst_sticker_jni.so:system_ext/lib64/libst_sticker_jni.so;FIX_
 odm/lib64/libOplusSecurity.so
 odm/lib64/libalogencrypt.so
 odm/lib64/libarcsoft_hdr_couple_api.so:odm/lib64/libarcsoft_hdr_couple_api_V2.so;DISABLE_CHECKELF
+odm/lib64/libdolbyencoderprocessor.so
+odm/lib64/libqcodec2_dolbyencoderfilter.so
 
 # Find X9 Ultra camera/QNN runtime assets
 odm/etc/camera/fb_model/000.png
@@ -210,6 +212,7 @@ odm/etc/camera/pfb_bin/ThirdPartyPreSkintuneBinary.bin
 odm/etc/camera/pfb_bin/ThirdPartyPreSkintuneMRTBinary.bin
 odm/etc/camera/pfb_bin/ThirdPartyPreVertFilterBinary.bin
 odm/etc/camera/pfb_bin/ThirdPartyPreVertSurBinary.bin
+vendor/lib64/libdscaalgo.so
 vendor/lib64/qsn1nrt430.bin
 vendor/lib64/qsn1nrt43270.bin
 vendor/lib64/qsn1rt1690_vga.bin

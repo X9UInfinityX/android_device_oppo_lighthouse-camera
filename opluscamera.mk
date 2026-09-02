@@ -108,6 +108,11 @@ PRODUCT_VENDOR_PROPERTIES += \
     ro.vendor.oplus.camera.backCamSize=200MP+200MP+50MP+50MP \
     ro.vendor.oplus.camera.frontCamSize=50MP
 
+PRODUCT_ODM_PROPERTIES += \
+    ro.vendor.oplus.dolby_vision.multi_cfg=1 \
+    ro.vendor.oplus.dolby_vision_dpu=1 \
+    ro.vendor.oplus.dolby_vision_dpu.dvs=1
+
 PRODUCT_SYSTEM_EXT_PROPERTIES += \
     ro.build.version.oplus.api=38 \
     ro.build.version.oplus.sub_api=47 \
