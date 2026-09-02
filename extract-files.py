@@ -25,6 +25,7 @@ from pathlib import Path
 import glob
 import re
 import shutil
+import zipfile
 
 
 APSCLIENT_STOCK_SHA256 = 'b6669463a2dbdc22d20d0bb1a565ef9f1cc058f5f34c627a8d49971f7c509bec'
@@ -33,6 +34,108 @@ APSCLIENT_HEIF_DLOPEN_TARGETS = (
     (0x4C11B, b'libHeifEncoderWrapper.so', b'xibHeifEncoderWrapper.so'),
     (0x48551, b'libNativeWinBuffExchange.so', b'xibNativeWinBuffExchange.so'),
 )
+
+
+_OPLUSCAMERA_DEX_STATE = {}
+
+
+def _smali_dir_to_dex_name(smali_dir):
+    if smali_dir.name == 'smali':
+        return 'classes.dex'
+
+    match = re.fullmatch(r'smali_classes(\d+)', smali_dir.name)
+    if match is None:
+        return None
+
+    return f'classes{match.group(1)}.dex'
+
+
+def _hash_smali_dir(smali_dir):
+    digest = sha256()
+    for smali in sorted(smali_dir.rglob('*.smali')):
+        digest.update(str(smali.relative_to(smali_dir)).encode())
+        digest.update(b'\0')
+        digest.update(smali.read_bytes())
+        digest.update(b'\0')
+    return digest.digest()
+
+
+def _get_smali_digests(tmp_dir):
+    digests = {}
+    for smali_dir in Path(tmp_dir).iterdir():
+        dex_name = _smali_dir_to_dex_name(smali_dir)
+        if dex_name is None or not smali_dir.is_dir():
+            continue
+        digests[dex_name] = _hash_smali_dir(smali_dir)
+    return digests
+
+
+def blob_fixup_opluscamera_capture_dex(ctx, file, file_path, *args, tmp_dir=None, **kwargs):
+    """Keep stock dex payloads so apktool only replaces dex files we patch."""
+    if tmp_dir is None:
+        return
+
+    with zipfile.ZipFile(file_path, 'r') as apk:
+        original_dex = {
+            info.filename: (info, apk.read(info))
+            for info in apk.infolist()
+            if re.fullmatch(r'classes(?:\d+)?\.dex', info.filename)
+        }
+
+    _OPLUSCAMERA_DEX_STATE[file_path] = {
+        'digests': _get_smali_digests(tmp_dir),
+        'dex': original_dex,
+    }
+
+
+def blob_fixup_opluscamera_restore_untouched_dex(
+    ctx,
+    file,
+    file_path,
+    *args,
+    tmp_dir=None,
+    **kwargs,
+):
+    """Restore original dex files whose decoded smali was not modified."""
+    if tmp_dir is None:
+        return
+
+    state = _OPLUSCAMERA_DEX_STATE.pop(file_path)
+    current_digests = _get_smali_digests(tmp_dir)
+    original_digests = state['digests']
+    original_dex = state['dex']
+
+    restore_names = {
+        dex_name
+        for dex_name in original_dex
+        if current_digests.get(dex_name) == original_digests.get(dex_name)
+    }
+    if not restore_names:
+        return
+
+    apk_path = Path(file_path)
+    rebuilt_path = apk_path.with_name(f'{apk_path.name}.dex-restored')
+    try:
+        with zipfile.ZipFile(apk_path, 'r') as rebuilt_apk:
+            rebuilt_infos = {
+                info.filename: info for info in rebuilt_apk.infolist()
+            }
+            with zipfile.ZipFile(rebuilt_path, 'w') as restored_apk:
+                restored_apk.comment = rebuilt_apk.comment
+                for info in rebuilt_apk.infolist():
+                    if info.filename in restore_names:
+                        continue
+                    restored_apk.writestr(info, rebuilt_apk.read(info))
+
+                for dex_name in sorted(restore_names):
+                    original_info, dex_data = original_dex[dex_name]
+                    info = rebuilt_infos.get(dex_name, original_info)
+                    restored_apk.writestr(info, dex_data)
+
+        shutil.copystat(apk_path, rebuilt_path)
+        rebuilt_path.replace(apk_path)
+    finally:
+        rebuilt_path.unlink(missing_ok=True)
 
 
 def lib_fixup_system_ext_suffix(lib: str, partition: str, *args, **kwargs):
@@ -6132,10 +6235,12 @@ blob_fixups: blob_fixups_user_type = {
         .stripzip(),
     'system_ext/priv-app/OplusCamera/OplusCamera.apk': blob_fixup()
         .call(blob_fixup_apktool_unpack_full)
+        .call(blob_fixup_opluscamera_capture_dex)
         .call(blob_fixup_opluscamera_font)
         .call(blob_fixup_opluscamera_blur_seginit_guard)
         .call(blob_fixup_strip_oem_permissions)
         .apktool_pack()
+        .call(blob_fixup_opluscamera_restore_untouched_dex)
         .stripzip(),
     'system_ext/app/SystemUIPlugin/SystemUIPlugin.apk': blob_fixup()
         .call(blob_fixup_apktool_unpack_full)
