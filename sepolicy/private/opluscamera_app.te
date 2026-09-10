@@ -27,6 +27,9 @@ allow opluscamera_app data_system_camera_rus:file { read write create getattr se
 get_prop(opluscamera_app, audio_config_prop)
 get_prop(opluscamera_app, qemu_hw_prop)
 
+# Stock OPPO Camera uses this to coordinate camera pre-opening.
+set_prop(opluscamera_app, oplus_camera_preopen_prop)
+
 allow opluscamera_app app_api_service:service_manager find;
 allow opluscamera_app audioserver_service:service_manager find;
 allow opluscamera_app cameraserver_service:service_manager find;

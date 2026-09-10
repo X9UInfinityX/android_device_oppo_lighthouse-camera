@@ -1,0 +1,366 @@
+diff --git a/services/camera/libcameraservice/CameraService.cpp b/services/camera/libcameraservice/CameraService.cpp
+index 562081cded..b149d35123 100644
+--- a/services/camera/libcameraservice/CameraService.cpp
++++ b/services/camera/libcameraservice/CameraService.cpp
+@@ -264,6 +264,7 @@ void CameraService::onFirstRef()
+     res = enumerateProviders();
+     if (res == OK) {
+         mInitialized = true;
++        CameraServiceExtFactory::setCameraServiceInstance(sp<CameraService>::fromExisting(this));
+     }
+ 
+     mUidPolicy = new UidPolicy(this);
+@@ -2590,6 +2591,17 @@ Status CameraService::connectHelper(const sp<CALLBACK>& cameraCb, const std::str
+ 
+     sCurrPackageName = clientPackageName;
+ 
++    // Stock Oplus CameraService runs its intelligent eviction/wait logic before
++    // taking mServiceLock. This gives a client that is still closing time to
++    // release the camera before the new client reaches the HAL open.
++    const int extConnectStatus = CameraServiceExtFactory::beforeConnect(
++            String8(cameraId.c_str()), String16(clientPackageName.c_str()), shimUpdateOnly);
++    if (extConnectStatus != NO_ERROR) {
++        return STATUS_ERROR_FMT(extConnectStatus,
++                "Oplus CameraService extension rejected camera \"%s\" for \"%s\"",
++                cameraId.c_str(), clientPackageName.c_str());
++    }
++
+     {
+         // Acquire mServiceLock and prevent other clients from connecting
+         std::unique_ptr<AutoConditionLock> lock =
+@@ -2847,6 +2859,12 @@ Status CameraService::connectHelper(const sp<CALLBACK>& cameraCb, const std::str
+         } else {
+             // Otherwise, add client to active clients list
+             finishConnectLocked(client, partial, oomScoreOffset, systemNativeClient);
++
++            CameraServiceExtFactory::afterConnect(
++                    String8(cameraId.c_str()), String16(clientPackageName.c_str()),
++                    shimUpdateOnly, static_cast<BasicClient*>(client.get()), client.get(),
++                    mCameraProviderManager->getProviderTagIdLocked(cameraId),
++                    static_cast<int>(effectiveApiLevel));
+         }
+ 
+         client->setImageDumpMask(mImageDumpMask);
+@@ -4386,6 +4404,9 @@ binder::Status CameraService::BasicClient::disconnect() {
+             getCallingPid());
+     }
+ 
++    CameraServiceExtFactory::afterDisconnect(
++            String8(mCameraIdStr.c_str()), String16(getPackageName().c_str()), sCameraService);
++
+     return res;
+ }
+ 
+diff --git a/services/camera/libcameraservice/api1/Camera2Client.cpp b/services/camera/libcameraservice/api1/Camera2Client.cpp
+index f6ba75c73e..1e2998a3e6 100644
+--- a/services/camera/libcameraservice/api1/Camera2Client.cpp
++++ b/services/camera/libcameraservice/api1/Camera2Client.cpp
+@@ -35,6 +35,7 @@
+ #include <gui/view/Surface.h>
+ 
+ #include "api1/Camera2Client.h"
++#include "CameraServiceExtFactory.h"
+ 
+ #include "api1/client2/StreamingProcessor.h"
+ #include "api1/client2/JpegProcessor.h"
+@@ -452,7 +453,11 @@ binder::Status Camera2Client::disconnect() {
+     binder::Status res = binder::Status::ok();
+     // Allow both client and the cameraserver to disconnect at all times
+     int callingPid = getCallingPid();
+-    if (callingPid != mCallingPid && callingPid != mServicePid) return res;
++    const bool invalidCaller = callingPid != mCallingPid && callingPid != mServicePid;
++    if (!CameraServiceExtFactory::beforeDisconnect(invalidCaller, mDevice == nullptr,
++            String8(mCameraIdStr.c_str()))) {
++        return res;
++    }
+ 
+     if (mDevice == nullptr) return res;
+ 
+diff --git a/services/camera/libcameraservice/common/Camera2ClientBase.cpp b/services/camera/libcameraservice/common/Camera2ClientBase.cpp
+index 3c75d45c76..d0b074a3dc 100644
+--- a/services/camera/libcameraservice/common/Camera2ClientBase.cpp
++++ b/services/camera/libcameraservice/common/Camera2ClientBase.cpp
+@@ -36,6 +36,7 @@
+ #include <com_android_internal_camera_flags.h>
+ 
+ #include "common/Camera2ClientBase.h"
++#include "CameraServiceExtFactory.h"
+ 
+ #include "api2/CameraDeviceClient.h"
+ 
+@@ -283,10 +284,17 @@ binder::Status Camera2ClientBase<TClientBase>::disconnectImpl() {
+ 
+     ALOGV("Camera %s: serializationLock acquired", TClientBase::mCameraIdStr.c_str());
+     binder::Status res = binder::Status::ok();
+-    // Allow both client and the media server to disconnect at all times
++    // Allow both client and the media server to disconnect at all times.
++    // The stock Oplus extension also marks an active close here so a competing
++    // connect waits for the HAL release instead of racing it.
+     int callingPid = TClientBase::getCallingPid();
+-    if (callingPid != TClientBase::mCallingPid &&
+-        callingPid != TClientBase::mServicePid) return res;
++    const bool invalidCaller = callingPid != TClientBase::mCallingPid &&
++            callingPid != TClientBase::mServicePid;
++    const bool skipDeviceDisconnect = mDevice == nullptr || TClientBase::mSharedMode;
++    if (!CameraServiceExtFactory::beforeDisconnect(invalidCaller, skipDeviceDisconnect,
++            String8(TClientBase::mCameraIdStr.c_str()))) {
++        return res;
++    }
+ 
+     ALOGD("Camera %s: Shutting down", TClientBase::mCameraIdStr.c_str());
+ 
+diff --git a/services/camera/libcameraservice/ext/CameraServiceExtFactory.cpp b/services/camera/libcameraservice/ext/CameraServiceExtFactory.cpp
+index df12292b7b..5af3437b61 100644
+--- a/services/camera/libcameraservice/ext/CameraServiceExtFactory.cpp
++++ b/services/camera/libcameraservice/ext/CameraServiceExtFactory.cpp
+@@ -1,12 +1,39 @@
+ #include "CameraServiceExtFactory.h"
++#include "CameraService.h"
++#include <android-base/properties.h>
+ #include <dlfcn.h>
+ #include <log/log.h>
++#include <mutex>
++#include <string>
++#include <unordered_map>
++#include <utility>
+ 
+ namespace android {
+ 
++namespace {
++
++struct TrackedCameraClient {
++    wp<CameraService::BasicClient> client;
++    std::string packageName;
++};
++
++std::mutex sTrackedClientMutex;
++std::unordered_map<std::string, TrackedCameraClient> sTrackedClients;
++
++std::string toUtf8(const String16& value) {
++    return String8(value).c_str();
++}
++
++} // namespace
++
+ void* CameraServiceExtFactory::sFunctionTable = nullptr;
+ void* CameraServiceExtFactory::sExtObject = nullptr;
+ int (*CameraServiceExtFactory::sOnTransactFunc)(void*, uint32_t, const Parcel&, Parcel*, uint32_t) = nullptr;
++void* CameraServiceExtFactory::sSetCameraServiceInstanceFunc = nullptr;
++void* CameraServiceExtFactory::sBeforeConnectFunc = nullptr;
++void* CameraServiceExtFactory::sAfterConnectFunc = nullptr;
++void* CameraServiceExtFactory::sBeforeDisconnectFunc = nullptr;
++void* CameraServiceExtFactory::sAfterDisconnectFunc = nullptr;
+ 
+ void CameraServiceExtFactory::ensureLoaded() {
+     if (sFunctionTable != nullptr) return;
+@@ -63,6 +90,26 @@ void CameraServiceExtFactory::ensureLoaded() {
+     } else {
+         ALOGI("CameraServiceExtFactory: onTransact found at %p", sOnTransactFunc);
+     }
++
++    sSetCameraServiceInstanceFunc = dlsym(handle,
++            "_ZN7android20CameraServiceExtImpl24setCameraServiceInstanceENS_2spINS_13CameraServiceEEE");
++    sBeforeConnectFunc = dlsym(handle,
++            "_ZN7android20CameraServiceExtImpl13beforeConnectERKNS_7String8ERKNS_8String16Eb");
++    sAfterConnectFunc = dlsym(handle,
++            "_ZN7android20CameraServiceExtImpl12afterConnectERKNS_7String8ERKNS_8String16EbNS_2spINS_13CameraService11BasicClientEEEPvmi");
++    sBeforeDisconnectFunc = dlsym(handle,
++            "_ZN7android20CameraServiceExtImpl16beforeDisconnectEbbRKNS_7String8E");
++    sAfterDisconnectFunc = dlsym(handle,
++            "_ZN7android20CameraServiceExtImpl15afterDisconnectENS_7String8ENS_8String16ENS_2spINS_13CameraServiceEEE");
++
++    if (sSetCameraServiceInstanceFunc == nullptr || sBeforeConnectFunc == nullptr ||
++            sAfterConnectFunc == nullptr || sBeforeDisconnectFunc == nullptr ||
++            sAfterDisconnectFunc == nullptr) {
++        ALOGE("CameraServiceExtFactory: one or more lifecycle hooks are unavailable: %s",
++                dlerror());
++    } else {
++        ALOGI("CameraServiceExtFactory: camera lifecycle hooks loaded");
++    }
+ }
+ 
+ void* CameraServiceExtFactory::getInstance() {
+@@ -70,29 +117,126 @@ void* CameraServiceExtFactory::getInstance() {
+     return sFunctionTable;   // may be null
+ }
+ 
+-int CameraServiceExtFactory::onTransact(uint32_t code, const Parcel& data, Parcel* reply, uint32_t flags) {
++void* CameraServiceExtFactory::getExtObject() {
+     ensureLoaded();
+     if (sExtObject == nullptr) {
+         if (sFunctionTable == nullptr) {
+-            ALOGE("CameraServiceExtFactory::onTransact: extension not loaded");
+-            return -1;
++            ALOGE("CameraServiceExtFactory::getExtObject: extension not loaded");
++            return nullptr;
+         }
+         void* actualFunc = *(void**)sFunctionTable;
+-        if (actualFunc == nullptr) return -1;
++        if (actualFunc == nullptr) return nullptr;
+         typedef void* (*GetObjectFunc)();
+         sExtObject = ((GetObjectFunc)actualFunc)();
+         if (sExtObject == nullptr) {
+             ALOGE("CameraServiceExtFactory: factory returned null");
+-            return -1;
++            return nullptr;
+         }
+         ALOGI("CameraServiceExtFactory: real extension object at %p", sExtObject);
+     }
++    return sExtObject;
++}
++
++int CameraServiceExtFactory::onTransact(uint32_t code, const Parcel& data, Parcel* reply,
++        uint32_t flags) {
++    void* extObject = getExtObject();
++    if (extObject == nullptr) return -1;
+ 
+     if (sOnTransactFunc == nullptr) {
+         ALOGE("CameraServiceExtFactory::onTransact: no function pointer");
+         return -1;
+     }
+-    return sOnTransactFunc(sExtObject, code, data, reply, flags);
++    return sOnTransactFunc(extObject, code, data, reply, flags);
++}
++
++void CameraServiceExtFactory::setCameraServiceInstance(const sp<CameraService>& service) {
++    void* extObject = getExtObject();
++    if (extObject == nullptr || sSetCameraServiceInstanceFunc == nullptr) return;
++    using Func = void (*)(void*, sp<CameraService>);
++    reinterpret_cast<Func>(sSetCameraServiceInstanceFunc)(extObject, service);
++}
++
++int CameraServiceExtFactory::beforeConnect(const String8& cameraId,
++        const String16& packageName, bool shimUpdateOnly) {
++    void* extObject = getExtObject();
++    int status = 0;
++    if (extObject != nullptr && sBeforeConnectFunc != nullptr) {
++        using Func = int (*)(void*, const String8&, const String16&, bool);
++        status = reinterpret_cast<Func>(sBeforeConnectFunc)(
++                extObject, cameraId, packageName, shimUpdateOnly);
++    }
++
++    if (status != 0 || shimUpdateOnly) return status;
++
++    const std::string newPackage = toUtf8(packageName);
++    const std::string systemCameraPackage = android::base::GetProperty(
++            "ro.oplus.system.camera.name", "com.oplus.camera");
++    if (newPackage != systemCameraPackage) return status;
++
++    sp<CameraService::BasicClient> clientToDisconnect;
++    std::string oldPackage;
++    {
++        std::lock_guard<std::mutex> lock(sTrackedClientMutex);
++        const auto it = sTrackedClients.find(cameraId.c_str());
++        if (it != sTrackedClients.end() && it->second.packageName != newPackage) {
++            clientToDisconnect = it->second.client.promote();
++            oldPackage = it->second.packageName;
++        }
++    }
++
++    if (clientToDisconnect != nullptr) {
++        ALOGI("CameraServiceExtFactory: evicting camera %s client %s for system camera %s",
++                cameraId.c_str(), oldPackage.c_str(), newPackage.c_str());
++        // block() is the server-initiated close path: it makes the caller valid,
++        // notifies the old app, and does not return until its HAL session is closed.
++        clientToDisconnect->block();
++    }
++
++    return status;
++}
++
++void CameraServiceExtFactory::afterConnect(const String8& cameraId,
++        const String16& packageName, bool shimUpdateOnly, void* client, void* cameraDevice,
++        size_t vendorTagId, int apiLevel) {
++    void* extObject = getExtObject();
++    if (extObject == nullptr || sAfterConnectFunc == nullptr || client == nullptr) return;
++
++    using Func = bool (*)(void*, const String8&, const String16&, bool,
++            sp<CameraService::BasicClient>, void*, size_t, int);
++    sp<CameraService::BasicClient> clientSp = sp<CameraService::BasicClient>::fromExisting(
++            static_cast<CameraService::BasicClient*>(client));
++    (void)reinterpret_cast<Func>(sAfterConnectFunc)(extObject, cameraId, packageName,
++            shimUpdateOnly, clientSp, cameraDevice, vendorTagId, apiLevel);
++
++    if (!shimUpdateOnly) {
++        std::lock_guard<std::mutex> lock(sTrackedClientMutex);
++        sTrackedClients[cameraId.c_str()] = {clientSp, toUtf8(packageName)};
++    }
++}
++
++bool CameraServiceExtFactory::beforeDisconnect(bool invalidCaller, bool skipDeviceDisconnect,
++        const String8& cameraId) {
++    void* extObject = getExtObject();
++    if (extObject == nullptr || sBeforeDisconnectFunc == nullptr) return true;
++    using Func = bool (*)(void*, bool, bool, const String8&);
++    return reinterpret_cast<Func>(sBeforeDisconnectFunc)(
++            extObject, invalidCaller, skipDeviceDisconnect, cameraId);
++}
++
++void CameraServiceExtFactory::afterDisconnect(String8 cameraId, String16 packageName,
++        const sp<CameraService>& service) {
++    void* extObject = getExtObject();
++    if (extObject != nullptr && sAfterDisconnectFunc != nullptr) {
++        using Func = void (*)(void*, String8, String16, sp<CameraService>);
++        reinterpret_cast<Func>(sAfterDisconnectFunc)(
++                extObject, cameraId, packageName, service);
++    }
++
++    std::lock_guard<std::mutex> lock(sTrackedClientMutex);
++    const auto it = sTrackedClients.find(cameraId.c_str());
++    if (it != sTrackedClients.end() && it->second.packageName == toUtf8(packageName)) {
++        sTrackedClients.erase(it);
++    }
+ }
+ 
+ CameraServiceExtFactory::~CameraServiceExtFactory() {
+diff --git a/services/camera/libcameraservice/ext/include/CameraServiceExtFactory.h b/services/camera/libcameraservice/ext/include/CameraServiceExtFactory.h
+index f7ab9c6859..d77c5baaad 100644
+--- a/services/camera/libcameraservice/ext/include/CameraServiceExtFactory.h
++++ b/services/camera/libcameraservice/ext/include/CameraServiceExtFactory.h
+@@ -1,24 +1,43 @@
+ #pragma once
+ 
+ #include <binder/Parcel.h>
++#include <utils/String16.h>
++#include <utils/String8.h>
++#include <utils/StrongPointer.h>
+ 
+ namespace android {
+ 
+ // Forward declaration – we will not define this class
++class CameraService;
+ class ICameraServiceExt;
+ 
+ class CameraServiceExtFactory {
+ public:
+-    // Returns a pointer to a function table (as required by OxygenOS)
+     static void* getInstance();
+     static int onTransact(uint32_t code, const Parcel& data, Parcel* reply, uint32_t flags);
++    static void setCameraServiceInstance(const sp<CameraService>& service);
++    static int beforeConnect(const String8& cameraId, const String16& packageName,
++            bool shimUpdateOnly);
++    static void afterConnect(const String8& cameraId, const String16& packageName,
++            bool shimUpdateOnly, void* client, void* cameraDevice, size_t vendorTagId,
++            int apiLevel);
++    static bool beforeDisconnect(bool invalidCaller, bool skipDeviceDisconnect,
++            const String8& cameraId);
++    static void afterDisconnect(String8 cameraId, String16 packageName,
++            const sp<CameraService>& service);
+     virtual ~CameraServiceExtFactory();
+ 
+ private:
+     static void ensureLoaded();
+-    static void* sFunctionTable;   // pointer to function pointer
+-    static void* sExtObject;        // the real extension object (as void*)
++    static void* getExtObject();
++    static void* sFunctionTable;
++    static void* sExtObject;
+     static int (*sOnTransactFunc)(void*, uint32_t, const Parcel&, Parcel*, uint32_t);
++    static void* sSetCameraServiceInstanceFunc;
++    static void* sBeforeConnectFunc;
++    static void* sAfterConnectFunc;
++    static void* sBeforeDisconnectFunc;
++    static void* sAfterDisconnectFunc;
+ };
+ 
+ } // namespace android

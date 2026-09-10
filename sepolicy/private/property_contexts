@@ -9,6 +9,7 @@ ro.vendor.oplus.dolby_vision_dpu.dvs u:object_r:exported_system_prop:s0
 camera.feature.remote.enable        u:object_r:exported_system_prop:s0
 oppo.switch.video.beauty            u:object_r:exported_system_prop:s0
 persist.assert.panic.camera         u:object_r:exported_system_prop:s0
+persist.sys.camera.pre.open.param   u:object_r:oplus_camera_preopen_prop:s0 exact string
 persist.sys.camera.                 u:object_r:exported_system_prop:s0
 persist.ipe.debug                   u:object_r:exported_system_prop:s0
 oplus.camera.packname               u:object_r:exported_system_prop:s0
