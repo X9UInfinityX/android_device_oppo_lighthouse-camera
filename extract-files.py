@@ -35,8 +35,50 @@ APSCLIENT_HEIF_DLOPEN_TARGETS = (
     (0x48551, b'libNativeWinBuffExchange.so', b'xibNativeWinBuffExchange.so'),
 )
 
+LIBCSEXTIMPL_FMT_SYMBOLS = {
+    b'_ZN3fmt3v1112report_errorEPKc':
+        b'_ZN3fmt3v1212report_errorEPKc',
+    b'_ZN3fmt3v116detail11assert_failEPKciS3_':
+        b'_ZN3fmt3v1211assert_failEPKciS2_',
+    b'_ZN3fmt3v116detail12is_printableEj':
+        b'_ZN3fmt3v126detail12is_printableEj',
+    b'_ZN3fmt3v116detail18decimal_point_implIcEET_NS1_10locale_refE':
+        b'_ZN3fmt3v126detail18decimal_point_implIcEET_NS0_10locale_refE',
+    b'_ZN3fmt3v116detail18thousands_sep_implIcEENS1_20thousands_sep_resultIT_EENS1_10locale_refE':
+        b'_ZN3fmt3v126detail18thousands_sep_implIcEENS1_20thousands_sep_resultIT_EENS0_10locale_refE',
+    b'_ZN3fmt3v116detail9dragonbox10to_decimalIdEENS2_10decimal_fpIT_EES5_':
+        b'_ZN3fmt3v126detail9dragonbox10to_decimalIdEENS2_10decimal_fpIT_EES5_',
+    b'_ZN3fmt3v116detail9dragonbox10to_decimalIfEENS2_10decimal_fpIT_EES5_':
+        b'_ZN3fmt3v126detail9dragonbox10to_decimalIfEENS2_10decimal_fpIT_EES5_',
+    b'_ZN3fmt3v116detail9dragonbox16get_cached_powerEi':
+        b'_ZN3fmt3v126detail9dragonbox16get_cached_powerEi',
+    b'_ZN3fmt3v116detail9write_locENS0_14basic_appenderIcEENS0_9loc_valueERKNS0_12format_specsENS1_10locale_refE':
+        b'_ZN3fmt3v126detail9write_locENS0_14basic_appenderIcEENS0_9loc_valueERKNS0_12format_specsENS0_10locale_refE',
+}
+
 
 _OPLUSCAMERA_DEX_STATE = {}
+
+
+def blob_fixup_libcsextimpl_fmt_v12(ctx, file, file_path, *args, **kwargs):
+    """Retarget the stock fmt v11 imports to Android 17's fmt v12 ABI."""
+    path = Path(file_path)
+    data = path.read_bytes()
+
+    for old_symbol, new_symbol in LIBCSEXTIMPL_FMT_SYMBOLS.items():
+        if len(new_symbol) > len(old_symbol):
+            raise ValueError(f'fmt replacement is too long: {new_symbol!r}')
+
+        old_entry = old_symbol + b'\0'
+        new_entry = new_symbol + b'\0' * (len(old_entry) - len(new_symbol))
+        count = data.count(old_entry)
+        if count != 1:
+            raise ValueError(
+                f'Expected one libcsextimpl symbol {old_symbol!r}, found {count}'
+            )
+        data = data.replace(old_entry, new_entry, 1)
+
+    path.write_bytes(data)
 
 
 def _smali_dir_to_dex_name(smali_dir):
@@ -6271,6 +6313,16 @@ def blob_fixup_filemanager_safecheck_direct(ctx, file, file_path, *args, tmp_dir
 
 
 blob_fixups: blob_fixups_user_type = {
+    'system_ext/lib64/libcsextimpl.so': blob_fixup()
+        .replace_needed(
+            'android.hardware.camera.device-V3-ndk.so',
+            'android.hardware.camera.device-V4-ndk.so',
+        )
+        .replace_needed(
+            'android.hardware.camera.provider-V3-ndk.so',
+            'android.hardware.camera.provider-V4-ndk.so',
+        )
+        .call(blob_fixup_libcsextimpl_fmt_v12),
     'system_ext/lib64/libAPSClient-cmd-jni.so': blob_fixup()
         .call(blob_fixup_apsclient_force_java_heif),
     'system_ext/framework/com.oplus.camera.unit.sdk.jar': blob_fixup()

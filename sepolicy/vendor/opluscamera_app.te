@@ -2,8 +2,10 @@ app_domain(opluscamera_app)
 net_domain(opluscamera_app)
 hal_client_domain(opluscamera_app, vendor_hal_dspmanager)
 hal_client_domain(opluscamera_app, vendor_hal_qspmhal)
+hal_client_domain(opluscamera_app, vendor_hal_oplus_urcc)
 
 allow opluscamera_app adsprpcd_file:dir r_dir_perms;
+allow opluscamera_app adsprpcd_file:file r_file_perms;
 allow opluscamera_app public_adsprpcd_file:file r_file_perms;
 allow opluscamera_app same_process_hal_file:file r_file_perms;
 

@@ -11,6 +11,18 @@ PRODUCT_PACKAGES += \
     oplus-services \
     Photos
 
+# Camera extension runtime libraries needed by libcsextimpl.so
+PRODUCT_PACKAGES += \
+    android.frameworks.cameraservice.common@2.0 \
+    android.frameworks.cameraservice.device@2.0 \
+    android.frameworks.cameraservice.service@2.2 \
+    android.hardware.camera.device-V4-ndk \
+    android.hardware.camera.provider-V4-ndk \
+    android.hardware.camera.provider@2.7 \
+    libcameraservice \
+    libdynamic_depth
+
+# System server
 PRODUCT_SYSTEM_SERVER_JARS += \
     oplus-services
 
