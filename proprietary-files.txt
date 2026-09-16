@@ -9,6 +9,7 @@ my_stock/app/Melody/Melody.apk:system_ext/app/Melody/Melody.apk
 my_stock/app/ambientalert/ambientalert.apk:system_ext/app/ambientalert/ambientalert.apk
 my_stock/priv-app/UMS/UMS.apk:system_ext/priv-app/UMS/UMS.apk
 system_ext/app/SystemUIPlugin/SystemUIPlugin.apk
+system_ext/app/OplusGestureUI/OplusGestureUI.apk
 system_ext/priv-app/OplusExSystemService/OplusExSystemService.apk
 my_product/lib64/libAPSClient-cmd-jni.so:system_ext/lib64/libAPSClient-cmd-jni.so;DISABLE_CHECKELF
 my_product/lib64/libAPSClient-jni.so:system_ext/lib64/libAPSClient-jni.so;DISABLE_CHECKELF
