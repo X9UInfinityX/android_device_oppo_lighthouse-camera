@@ -53,6 +53,5 @@ allow opluscamera_app system_server:udp_socket {
 #  Suppress noisy debugfs denials
 dontaudit opluscamera_app debugfs_tracing:file rw_file_perms;
 
-# OplusShoulderPressureManagerService falls back to default_android_service
-# because it has no label. Cannot allow (neverallow blocks it), so suppress.
-dontaudit opluscamera_app default_android_service:service_manager find;
+# OplusShoulderPressureManagerService is exposed as an app API service.
+allow opluscamera_app oplus_shoulder_pressure_service:service_manager find;
