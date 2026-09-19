@@ -82,6 +82,7 @@ would now suppress valid file-operation behavior.
 | Package/file | Fixup and reason |
 | --- | --- |
 | SystemUIPlugin | Replaces Oplus wrapper API descriptors. The old `k9/b`/`t4/h` inflater patch is retired: those classes now represent unrelated constants and a `CompositionSamplingListener`, while the current plugin uses `ContextHandler` directly. |
+| OplusGestureUI | Moves the private `com.oplus.gesture_nonIndexKey` cache in `GestureSettingsProviderUtils` (`k8/q`) from `Settings.System` to `Settings.Secure`. AOSP rejects app-defined System settings and otherwise propagates the provider exception into SettingsIntelligence during search indexing. |
 | Melody | `RepackagingDetector.java` (`com/oplus/melody/common/util/N`) derives the AES key used for the bundled earphone whitelist from the signing certificate. Methods `b/c/d(Context)` return the verified stock SHA-256 certificate hash `B0:A9:BB:FC:05:EE:E5:E7:D0:A2:C9:7C:03:05:86:E1:5B:B3:30:11:52:07:8F:54:47:3B:B8:2D:F6:D8:C8:18`; only `e(Context)`, the LSPatch predicate, is forced false. |
 | StdID | Converts both `AppApplication.onCreate()` dynamic receiver registrations to the flags overload with `RECEIVER_NOT_EXPORTED`, preserving the optional permission argument. |
 | SafeCenter | Adds `RECEIVER_NOT_EXPORTED` to `BaseSelfFinishActivity`, forces the actual `OLockManager.isSupportOLock` predicate `j7/k.J(Context)` true, and supplies the missing OLock dark theme. |

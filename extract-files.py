@@ -251,6 +251,52 @@ def blob_fixup_apktool_unpack_manifest(ctx, file, file_path, *args, tmp_dir=None
     ])
 
 
+def blob_fixup_gestureui_search_settings_namespace(
+    ctx,
+    file,
+    file_path,
+    *args,
+    tmp_dir=None,
+    **kwargs,
+):
+    # GestureSearchIndexablesProvider stores its private non-indexable-key
+    # cache through Settings.System. AOSP rejects app-defined System settings,
+    # and the resulting provider exception crashes SettingsIntelligence while
+    # it builds the search index. Keep the same key and move all accesses to
+    # Settings.Secure, where the provider already stores its related cache.
+    if tmp_dir is None:
+        return
+
+    smali = _find_smali(
+        tmp_dir,
+        'k8/q.smali',
+        'OplusGestureUI GestureSettingsProviderUtils',
+    )
+    data = smali.read_text(encoding='utf-8')
+    key = 'com.oplus.gesture_nonIndexKey'
+    # Method c() reuses the register holding the key for its final write, so
+    # the literal occurs twice even though there are three settings accesses.
+    if data.count(key) != 2:
+        raise ValueError('OplusGestureUI non-indexable cache key count changed')
+
+    put_system = (
+        'Landroid/provider/Settings$System;->putString('
+        'Landroid/content/ContentResolver;Ljava/lang/String;Ljava/lang/String;)Z'
+    )
+    put_secure = put_system.replace('Settings$System', 'Settings$Secure')
+    get_system = (
+        'Landroid/provider/Settings$System;->getString('
+        'Landroid/content/ContentResolver;Ljava/lang/String;)Ljava/lang/String;'
+    )
+    get_secure = get_system.replace('Settings$System', 'Settings$Secure')
+
+    if data.count(put_system) != 2 or data.count(get_system) != 1:
+        raise ValueError('OplusGestureUI Settings.System access pattern changed')
+
+    fixed = data.replace(put_system, put_secure).replace(get_system, get_secure)
+    smali.write_text(fixed, encoding='utf-8')
+
+
 def blob_fixup_opluscamera_font(ctx, file, file_path, *args, tmp_dir=None, **kwargs):
     # OEM camera font-NPE neutralizer. The TypeFaceUtil static
     # a(Context)->Typeface path reads OEM font framework state that is absent
@@ -6245,6 +6291,11 @@ blob_fixups: blob_fixups_user_type = {
     'system_ext/app/SystemUIPlugin/SystemUIPlugin.apk': blob_fixup()
         .call(blob_fixup_apktool_unpack_full)
         .call(blob_fixup_oplus_camera_system_properties)
+        .apktool_pack()
+        .stripzip(),
+    'system_ext/app/OplusGestureUI/OplusGestureUI.apk': blob_fixup()
+        .call(blob_fixup_apktool_unpack_full)
+        .call(blob_fixup_gestureui_search_settings_namespace)
         .apktool_pack()
         .stripzip(),
     'system_ext/priv-app/OppoGallery2/OppoGallery2.apk': blob_fixup()
