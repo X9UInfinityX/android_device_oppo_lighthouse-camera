@@ -13,3 +13,33 @@ allow vendor_hal_cryptoeng_oplus vendor_dmabuf_qseecom_ta_heap_device:chr_file r
 allow vendor_hal_cryptoeng_oplus hidl_base_hwservice:hwservice_manager add;
 allow vendor_hal_cryptoeng_oplus system_app:dir search;
 allow vendor_hal_cryptoeng_oplus system_app:file r_file_perms;
+
+# Stock F9UEU Widevine / CryptoEng access. Keep the existing service domain
+# and labels shared with the OPlus camera integration.
+allow vendor_hal_cryptoeng_oplus vendor_cryptoeng_vendor_data_file:dir create_dir_perms;
+allow vendor_hal_cryptoeng_oplus vendor_cryptoeng_vendor_data_file:file create_file_perms;
+
+# Load the stock secure application and access the Qualcomm crypto devices.
+r_dir_file(vendor_hal_cryptoeng_oplus, firmware_file)
+allow vendor_hal_cryptoeng_oplus ion_device:chr_file rw_file_perms;
+allow vendor_hal_cryptoeng_oplus vendor_qce_device:chr_file rw_file_perms;
+allow vendor_hal_cryptoeng_oplus self:qipcrtr_socket { read write create getattr setopt };
+r_dir_file(vendor_hal_cryptoeng_oplus, vendor_proc_oppo_secure_common_file)
+get_prop(vendor_hal_cryptoeng_oplus, vendor_tee_listener_prop)
+get_prop(vendor_hal_cryptoeng_oplus, vendor_nw_exported_system_prop)
+get_prop(vendor_hal_cryptoeng_oplus, vendor_cryptoeng_init_prop)
+
+# OEMCrypto uses the stock DRM service and secure hardware services.
+hal_client_domain(vendor_hal_cryptoeng_oplus, hal_drm)
+binder_call(vendor_hal_cryptoeng_oplus, hal_drm_widevine)
+binder_call(vendor_hal_cryptoeng_oplus, vendor_hal_qteeconnector_qti)
+binder_call(vendor_hal_cryptoeng_oplus, vendor_hal_soter_qti)
+allow vendor_hal_cryptoeng_oplus vendor_hal_soter_hwservice:hwservice_manager find;
+
+# Stock persistent storage access; never replace or erase per-device contents.
+allow vendor_hal_cryptoeng_oplus mnt_vendor_file:dir search;
+allow vendor_hal_cryptoeng_oplus vendor_persist_data_file:dir { write add_name search };
+allow vendor_hal_cryptoeng_oplus vendor_persist_data_file:file { read write create open };
+allow vendor_hal_cryptoeng_oplus vendor_file:file lock;
+allow vendor_hal_cryptoeng_oplus oppo_reserve_file:dir { read write create getattr open add_name remove_name search };
+allow vendor_hal_cryptoeng_oplus oppo_reserve_file:file { read write create getattr open };

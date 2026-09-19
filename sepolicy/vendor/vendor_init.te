@@ -1,0 +1,3 @@
+# The stock CryptoEng init script sets this at sys.boot_completed=1.
+# Reading the property in the HAL also requires the writer to be permitted.
+set_prop(vendor_init, vendor_cryptoeng_init_prop)
