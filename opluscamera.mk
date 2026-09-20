@@ -1,6 +1,9 @@
 # OPlus Camera source tree
 OPLUS_CAMERA_PATH := device/oppo/lighthouse-camera
 
+# Properties with spaces must come from a property file rather than a Make list.
+TARGET_VENDOR_PROP += $(OPLUS_CAMERA_PATH)/vendor.prop
+
 # Blob dependencies
 PRODUCT_PACKAGES += \
     aon.frameworkres.overlay.product \
