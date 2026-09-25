@@ -4,8 +4,6 @@ hal_client_domain(opluscamera_app, vendor_hal_dspmanager)
 hal_client_domain(opluscamera_app, vendor_hal_qspmhal)
 hal_client_domain(opluscamera_app, vendor_hal_oplus_urcc)
 
-allow opluscamera_app adsprpcd_file:dir r_dir_perms;
-allow opluscamera_app adsprpcd_file:file r_file_perms;
 allow opluscamera_app public_adsprpcd_file:file r_file_perms;
 allow opluscamera_app same_process_hal_file:file r_file_perms;
 
@@ -13,8 +11,6 @@ allow opluscamera_app same_process_hal_file:file r_file_perms;
 allow opluscamera_app occe_data_file:dir r_dir_perms;
 allow opluscamera_app occe_data_file:file r_file_perms;
 
-allow opluscamera_app vendor_data_file:dir  { read open search write add_name remove_name create getattr rename reparent rmdir setattr };
-allow opluscamera_app vendor_data_file:file { read open write create unlink getattr rename };
 allow opluscamera_app vendor_camera_update_data_file:file { read open write create unlink getattr };
 allow opluscamera_app vendor_camera_update_data_file:dir { read open search write add_name remove_name create getattr };
 allow opluscamera_app vendor_xdsp_device:file { read open write create unlink getattr };
@@ -42,9 +38,6 @@ allow opluscamera_app shell_data_file:dir search;
 # selinuxfs
 allow opluscamera_app selinuxfs:file { read open };
 
-# ADSP RPC dir search
-allow opluscamera_app adsprpcd_file:dir search;
-
 # Binder: camera app ↔ camera HAL
 allow opluscamera_app hal_camera_default:binder { call transfer };
 
@@ -55,10 +48,6 @@ get_prop(opluscamera_app, camera_config_prop)
 binder_use(opluscamera_app)
 binder_call(opluscamera_app, system_server)
 binder_call(opluscamera_app, surfaceflinger)
-allow opluscamera_app vendor_default_prop:file { open read getattr map };
-
-
-
 allow opluscamera_app activity_service:service_manager find;
 allow opluscamera_app display_service:service_manager find;
 allow opluscamera_app surfaceflinger_service:service_manager find;

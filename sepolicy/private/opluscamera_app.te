@@ -1,3 +1,5 @@
+typeattribute opluscamera_app coredomain;
+
 #  Own data directory
 allow opluscamera_app opluscamera_app_data_file:dir  create_dir_perms;
 allow opluscamera_app opluscamera_app_data_file:file create_file_perms;
