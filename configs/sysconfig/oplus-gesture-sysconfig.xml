@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<config>
+    <!-- OplusGestureUI starts its input RUS service from Application.onCreate(). -->
+    <allow-in-power-save package="com.oplus.gesture" />
+</config>
