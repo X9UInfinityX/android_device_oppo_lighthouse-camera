@@ -339,6 +339,43 @@ def blob_fixup_gestureui_search_settings_namespace(
     smali.write_text(fixed, encoding='utf-8')
 
 
+def blob_fixup_gestureui_settings_search(ctx, file, file_path, *args, tmp_dir=None, **kwargs):
+    # Google Settings Intelligence requires the root tag of every XML exposed
+    # by a SearchIndexablesProvider to be the unqualified PreferenceScreen.
+    # AndroidX's inflater still resolves that tag to androidx.preference.
+    if tmp_dir is None:
+        return
+
+    xml_dir = Path(tmp_dir) / 'res/xml'
+    old_open = '<androidx.preference.PreferenceScreen'
+    old_close = '</androidx.preference.PreferenceScreen>'
+    new_open = '<PreferenceScreen'
+    new_close = '</PreferenceScreen>'
+    old_roots = []
+    new_roots = []
+
+    for preference_xml in sorted(xml_dir.glob('*.xml')):
+        data = preference_xml.read_text(encoding='utf-8')
+        if old_open in data:
+            if data.count(old_open) != 1 or data.count(old_close) != 1:
+                raise ValueError(
+                    f'OplusGestureUI PreferenceScreen structure changed: {preference_xml.name}'
+                )
+            preference_xml.write_text(
+                data.replace(old_open, new_open, 1).replace(old_close, new_close, 1),
+                encoding='utf-8',
+            )
+            old_roots.append(preference_xml.name)
+        elif new_open in data:
+            new_roots.append(preference_xml.name)
+
+    if len(old_roots) + len(new_roots) != 19:
+        raise ValueError(
+            'OplusGestureUI indexed PreferenceScreen XML count changed: '
+            f'{len(old_roots) + len(new_roots)}'
+        )
+
+
 def blob_fixup_opluscamera_font(ctx, file, file_path, *args, tmp_dir=None, **kwargs):
     # OEM camera font-NPE neutralizer. The TypeFaceUtil static
     # a(Context)->Typeface path reads OEM font framework state that is absent
@@ -866,6 +903,34 @@ def blob_fixup_aiunit_settings_category(ctx, file, file_path, *args, tmp_dir=Non
         raise ValueError('AIUnit Settings category metadata not found')
 
     manifest.write_text(data.replace(old, _SETTINGS_CATEGORY_ADVANCED_SECURITY_META, 1), encoding='utf-8')
+
+
+def blob_fixup_aiunit_settings_search(ctx, file, file_path, *args, tmp_dir=None, **kwargs):
+    # Google Settings Intelligence only accepts an unqualified PreferenceScreen
+    # root while indexing XML returned by a SearchIndexablesProvider. AndroidX's
+    # inflater still resolves the unqualified tag to androidx.preference.
+    if tmp_dir is None:
+        return
+
+    preference_xml = Path(tmp_dir) / 'res/xml/fragment_ai_service_platform.xml'
+    data = preference_xml.read_text(encoding='utf-8') if preference_xml.exists() else ''
+    if not data:
+        raise ValueError('AIUnit AI Service Engine preference XML not found')
+
+    old_open = '<androidx.preference.PreferenceScreen'
+    old_close = '</androidx.preference.PreferenceScreen>'
+    new_open = '<PreferenceScreen'
+    new_close = '</PreferenceScreen>'
+
+    if old_open not in data or old_close not in data:
+        if new_open in data and new_close in data:
+            return
+        raise ValueError('AIUnit AI Service Engine PreferenceScreen root not found')
+
+    preference_xml.write_text(
+        data.replace(old_open, new_open, 1).replace(old_close, new_close, 1),
+        encoding='utf-8',
+    )
 
 
 def blob_fixup_phonemanager_permission_controller_package(ctx, file, file_path, *args, tmp_dir=None, **kwargs):
@@ -6348,6 +6413,7 @@ blob_fixups: blob_fixups_user_type = {
     'system_ext/app/OplusGestureUI/OplusGestureUI.apk': blob_fixup()
         .call(blob_fixup_apktool_unpack_full)
         .call(blob_fixup_gestureui_search_settings_namespace)
+        .call(blob_fixup_gestureui_settings_search)
         .apktool_pack()
         .stripzip(),
     'system_ext/priv-app/OppoGallery2/OppoGallery2.apk': blob_fixup()
@@ -6393,6 +6459,7 @@ blob_fixups: blob_fixups_user_type = {
     'product/priv-app/AIUnit/AIUnit.apk': blob_fixup()
         .call(blob_fixup_apktool_unpack_manifest)
         .call(blob_fixup_aiunit_settings_category)
+        .call(blob_fixup_aiunit_settings_search)
         .apktool_pack()
         .stripzip(),
     'system_ext/etc/permissions/vendor-oplus-hardware-cryptoeng.xml': blob_fixup()

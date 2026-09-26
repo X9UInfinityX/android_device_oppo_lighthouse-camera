@@ -82,12 +82,12 @@ would now suppress valid file-operation behavior.
 | Package/file | Fixup and reason |
 | --- | --- |
 | SystemUIPlugin | Replaces Oplus wrapper API descriptors. The old `k9/b`/`t4/h` inflater patch is retired: those classes now represent unrelated constants and a `CompositionSamplingListener`, while the current plugin uses `ContextHandler` directly. |
-| OplusGestureUI | Moves the private `com.oplus.gesture_nonIndexKey` cache in `GestureSettingsProviderUtils` (`k8/q`) from `Settings.System` to `Settings.Secure`. AOSP rejects app-defined System settings and otherwise propagates the provider exception into SettingsIntelligence during search indexing. |
+| OplusGestureUI | Moves the private `com.oplus.gesture_nonIndexKey` cache in `GestureSettingsProviderUtils` (`k8/q`) from `Settings.System` to `Settings.Secure`. AOSP rejects app-defined System settings and otherwise propagates the provider exception into SettingsIntelligence during search indexing. Its 19 indexed preference XMLs also use unqualified `PreferenceScreen` roots so Google Settings Intelligence can parse them. |
 | Melody | `RepackagingDetector.java` (`com/oplus/melody/common/util/N`) derives the AES key used for the bundled earphone whitelist from the signing certificate. Methods `b/c/d(Context)` return the verified stock SHA-256 certificate hash `B0:A9:BB:FC:05:EE:E5:E7:D0:A2:C9:7C:03:05:86:E1:5B:B3:30:11:52:07:8F:54:47:3B:B8:2D:F6:D8:C8:18`; only `e(Context)`, the LSPatch predicate, is forced false. |
 | StdID | Converts both `AppApplication.onCreate()` dynamic receiver registrations to the flags overload with `RECEIVER_NOT_EXPORTED`, preserving the optional permission argument. |
 | SafeCenter | Adds `RECEIVER_NOT_EXPORTED` to `BaseSelfFinishActivity`, forces the actual `OLockManager.isSupportOLock` predicate `j7/k.J(Context)` true, and supplies the missing OLock dark theme. |
 | PhoneManager | Adds secure-settings permission, maps its Settings tile to AOSP's security/privacy category, and points the `MANAGE_PERMISSIONS` intent package from Google's permission controller to `com.android.permissioncontroller`. |
-| AONService / AIUnit | Maps their OEM Settings metadata to AOSP's advanced-security category so TileUtils places them correctly. |
+| AONService / AIUnit | Maps their OEM Settings metadata to AOSP's advanced-security category so TileUtils places them correctly. AIUnit also uses an unqualified `PreferenceScreen` root for its AI Service Engine XML so Google Settings Intelligence can index it without crashing. |
 | UMS | Adds `SET_ACTIVITY_WATCHER` to both the manifest and its privapp allowlist. |
 | SecurityPermission | Defines the Oplus/Oppo signature/privileged permissions referenced by the ported applications. |
 | Cryptoeng permission XML | Merges the dump's two adjacent `<permissions>` roots into one valid document. |
