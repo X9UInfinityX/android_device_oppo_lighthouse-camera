@@ -376,6 +376,109 @@ def blob_fixup_gestureui_settings_search(ctx, file, file_path, *args, tmp_dir=No
         )
 
 
+def blob_fixup_gestureui_light_press_default(
+    ctx,
+    file,
+    file_path,
+    *args,
+    tmp_dir=None,
+    **kwargs,
+):
+    # ColorOS provisions the camera-button light-press setting outside the
+    # read-only product image. Recreate that fresh-user state without
+    # overwriting an explicit user choice stored in Settings.Secure.
+    if tmp_dir is None:
+        return
+
+    smali = _find_smali(tmp_dir, 'b8/m.smali', 'OplusGestureUI SpruceKeyUtils')
+    data = smali.read_text(encoding='utf-8')
+
+    method_start = data.find('.method public static b()V')
+    method_end = data.find('.end method', method_start)
+    if method_start < 0 or method_end < 0:
+        raise ValueError('OplusGestureUI Spruce defaults method not found')
+    method_end += len('.end method')
+    defaults_method = data[method_start:method_end]
+
+    enabled_match = re.search(r'const/4 ([vp]\d+), 0x1', defaults_method)
+    if enabled_match is None:
+        raise ValueError('OplusGestureUI enabled-value register not found')
+    enabled_register = enabled_match.group(1)
+
+    setting_pattern = (
+        r'(const-string (?P<key_register>[vp]\d+), '
+        r'"oplus_camera_light_press_spruce"\s*'
+        r'invoke-static \{(?P<context>[vp]\d+), (?P=key_register), )'
+        r'(?P<value>[vp]\d+)'
+        r'(, (?P<user>[vp]\d+)\}, '
+        r'Lcom/oplus/gesture/util/GestureUtil;->setSecureIntForUser\('
+        r'Landroid/content/Context;Ljava/lang/String;II\)V)'
+    )
+    defaults_method, count = re.subn(
+        setting_pattern,
+        rf'\g<1>{enabled_register}\g<5>',
+        defaults_method,
+        count=1,
+    )
+    if count != 1:
+        raise ValueError('OplusGestureUI fresh-user light-press default not patched')
+    data = data[:method_start] + defaults_method + data[method_end:]
+
+    helper = (
+        '.method public static lighthouseInitLightPressDefault()V\n'
+        '    .locals 4\n'
+        '\n'
+        '    sget-boolean v0, Lb8/m;->e:Z\n'
+        '\n'
+        '    if-eqz v0, :cond_lighthouse_done\n'
+        '\n'
+        '    invoke-static {}, Landroid/app/ActivityManager;->getCurrentUser()I\n'
+        '\n'
+        '    move-result v0\n'
+        '\n'
+        '    sget-object v1, Lb8/m;->a:Landroid/content/Context;\n'
+        '\n'
+        '    invoke-virtual {v1}, Landroid/content/Context;->getContentResolver()Landroid/content/ContentResolver;\n'
+        '\n'
+        '    move-result-object v1\n'
+        '\n'
+        '    const-string v2, "oplus_camera_light_press_spruce"\n'
+        '\n'
+        '    invoke-static {v1, v2, v0}, Landroid/provider/Settings$Secure;->getStringForUser(Landroid/content/ContentResolver;Ljava/lang/String;I)Ljava/lang/String;\n'
+        '\n'
+        '    move-result-object v1\n'
+        '\n'
+        '    if-nez v1, :cond_lighthouse_done\n'
+        '\n'
+        '    sget-object v1, Lb8/m;->a:Landroid/content/Context;\n'
+        '\n'
+        '    const/4 v3, 0x1\n'
+        '\n'
+        '    invoke-static {v1, v2, v3, v0}, Lcom/oplus/gesture/util/GestureUtil;->setSecureIntForUser(Landroid/content/Context;Ljava/lang/String;II)V\n'
+        '\n'
+        '    :cond_lighthouse_done\n'
+        '    return-void\n'
+        '.end method\n'
+        '\n'
+    )
+    init_anchor = '.method public static l(Landroid/content/Context;)V\n'
+    if data.count(init_anchor) != 1:
+        raise ValueError('OplusGestureUI Spruce initialization method changed')
+    data = data.replace(init_anchor, helper + init_anchor, 1)
+
+    defaults_call = '    invoke-static {}, Lb8/m;->b()V\n'
+    if data.count(defaults_call) != 1:
+        raise ValueError('OplusGestureUI Spruce defaults call changed')
+    data = data.replace(
+        defaults_call,
+        defaults_call
+        + '\n'
+        + '    invoke-static {}, Lb8/m;->lighthouseInitLightPressDefault()V\n',
+        1,
+    )
+    smali.write_text(data, encoding='utf-8')
+
+
 def blob_fixup_opluscamera_font(ctx, file, file_path, *args, tmp_dir=None, **kwargs):
     # OEM camera font-NPE neutralizer. The TypeFaceUtil static
     # a(Context)->Typeface path reads OEM font framework state that is absent
@@ -6412,6 +6515,7 @@ blob_fixups: blob_fixups_user_type = {
         .stripzip(),
     'system_ext/app/OplusGestureUI/OplusGestureUI.apk': blob_fixup()
         .call(blob_fixup_apktool_unpack_full)
+        .call(blob_fixup_gestureui_light_press_default)
         .call(blob_fixup_gestureui_search_settings_namespace)
         .call(blob_fixup_gestureui_settings_search)
         .apktool_pack()
