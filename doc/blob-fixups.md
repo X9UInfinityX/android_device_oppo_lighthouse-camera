@@ -1,7 +1,7 @@
-# Blob fixups for ColorOS 16.0.9.403
+# Blob fixups for ColorOS 17.0.0.101
 
 This document describes the active fixups in `extract-files.py` for the OPPO
-Find X9 Ultra (`CPH2841_16.0.9.403(EX01)`). It is a rebase guide: obfuscated
+Find X9 Ultra (`CPH2841_17.0.0.101(EX01)`). It is a rebase guide: obfuscated
 class names are recorded for this release, but they are not sufficient proof
 that a patch still belongs in a later app.
 
@@ -25,37 +25,45 @@ For every new firmware:
 
 ## Camera and camera SDK
 
-| Fixup | 16.0.9.403 semantic target | Effect |
+| Fixup | 17.0.0.101 semantic target | Effect |
 | --- | --- | --- |
-| Camera typeface fallback | `TypeFaceUtil.a(Context)` in `a8/v3` reads `OplusBaseConfiguration`, `OplusExtraConfiguration`, and `OplusFontUtils`. | Returns `Typeface.DEFAULT`, avoiding an NPE/linkage failure when the complete Oplus font framework is unavailable. |
-| Blur `segInit` guards | `OplusBlurProcess` (`cc/b`) and the size-change initializer (`ec/i`) call `OplusBlurPreviewHelper.segInit(...)`, save its `int[]`, and immediately dereference it. | Treats a null result as an unavailable blur engine. The synchronized process path exits its monitor and returns `false`; the size-change path returns `void`. |
+| Camera typeface fallback | The `TypeFaceUtil.a(Context)` method that reads `OplusBaseConfiguration`, `OplusExtraConfiguration`, and `OplusFontUtils`. | Returns `Typeface.DEFAULT`, avoiding an NPE/linkage failure when the complete Oplus font framework is unavailable. |
+| Blur `segInit` guards | `OplusBlurProcess` (`hf/b`) and the size-change initializer (`jf/j`) call `OplusBlurPreviewHelper.segInit(...)`, save its `int[]`, and immediately dereference it. | Treats a null result as an unavailable blur engine. The synchronized process path exits its monitor and returns `false`; the size-change path returns `void`. |
 | OEM wrapper shims | Calls to the Oplus wrapper forms of `SystemProperties`, `UserHandle`, `Trace`, and `Debug`. | Redirects them to the corresponding framework hidden APIs with the same signatures. This is used by SystemUIPlugin, Melody, and FileEncryption. |
 | OEM component permissions | Component-level Oplus/Oppo/HeyTap permission gates in Camera, Gallery, and Melody manifests. | Removes gates whose OEM permission ownership is not reliable after platform resigning, while leaving the components registered. Review newly introduced app-owned permissions before broadening this rule. |
-| Camera SDK patch set | `com.oplus.camera.unit.sdk.jar`; the patch applies to named SDK classes, including `BaseMode.isSensorModeNeedWait(II)`. | Removes explicit false-valued smali field initializers that break the rebuild and disables the mode-3 sensor wait that stalls the port. |
+| Camera SDK sensor wait | `com.oplus.camera.unit.sdk.jar`; `BaseMode.isSensorModeNeedWait(II)`. | Disables the mode-3 sensor wait that stalls the port. COS17 rebuilds with its stock field initializers, so the old no-op initializer rewrites were removed. |
 | Face-beauty probe | The guarded string probe for `libApsFaceBeautyPreviewProductJni.so`. | Changes `/product/lib64` to the library's port location, `/system_ext/lib64`. |
 | APS Java HEIF handoff | `libAPSClient-cmd-jni.so`, pinned by stock and post-patch SHA-256 plus exact offsets. | Makes two optional native `dlopen` probes fail so APS follows its stock Java-reflection HEIF path instead of the accidentally enabled co-located native path. |
 
 ## FileEncryption
 
-`BiometricsUnlockManager.kt` is `x8/a` in this firmware. Its stock face method
+`BiometricsUnlockManager.kt` is `r9/a` in this firmware. Its stock face method
 uses `OplusFaceManager` through Epona and its fingerprint method uses the Oplus
-fingerprint wrapper. The fixup replaces only those enrollment predicates with
+fingerprint wrapper (methods `c` and `d`, respectively). The fixup replaces
+only those enrollment predicates with
 the AOSP `FaceManager.hasEnrolledTemplates()` and
 `FingerprintManager.isHardwareDetected()/hasEnrolledFingerprints()` calls.
 Both paths fail closed on an exception. The manifest gains the biometric and
 secure-settings permissions required by those calls.
 
+The Private Safe unlock-method dialog uses the standalone preference fragment's
+full-height floating toolbar layout. Its toolbar is not removed because the
+fragment looks up the wrong ID. Adapted from OP15InfinityX commit
+`73cae650db7c01cc66e273f00f400fbfd032f20d`, the dialog fixup removes the
+real toolbar, sizes the preference list to its content, and lets the dialog
+supply its own background. It also avoids COUI's vendor-only raw scroll path
+when the framework lacks that API.
+
 ## Gallery
 
-| Fixup | 16.0.9.403 semantic target | Effect |
+| Fixup | 17.0.0.101 semantic target | Effect |
 | --- | --- | --- |
-| Dynamic receiver flags | `BroadcastDispatcher.kt` (`ay5`) proxy registration and the concrete `ActionReceiver`. | Clears `RECEIVER_EXPORTED` and sets `RECEIVER_NOT_EXPORTED`, preserving unrelated flag bits. |
-| Wallpaper intent | `PictureEditorDM.a(Activity, Uri)` is the method containing `getCropAndSetWallpaperIntent`. | Uses `ACTION_ATTACH_DATA` with `image/*`, URI read permission, and the existing activity instead of the unavailable Oplus wallpaper crop flow. |
-| Safe Box capability | `ConfigAbilityWrapper.kt` (`g19`), the global boolean accessor `c(String, boolean, boolean)`. | Returns true only for `feature_is_support_user_custom_safe_box`; all other config keys retain stock handling. |
-| Google Photos verify listener | `GCloudPageHelper.kt` (`llf`), callback `a(boolean)` holding `mlf.e`. | Continues into the existing page helper for either verification result so a failed first verification can reach consent. |
-| Google Photos consent coroutine | `GCloudSyncStatusManager$c`, uniquely anchored by `verifyAppState failure. e:` and `GooglePhotosBackupApiClient.verifyAppState`. | On the failure branch, launches the app's existing `gotoGrantConnectionConsent` coroutine (`fnf`) on its own scope (`dk3`) with `EntryPoint.SETTINGS`. |
-| Hide Google Photos surfaces | The `action_backup_to_cloud` action-definition `LinkedHashMap` (`ncu`) and `SettingsActivity$SettingFragment`. | Removes the backup action ID from the photo-page menu map and removes `pref_category_cloud_sync_key` after Settings inflation. |
-| System share | `ShareHelper.kt` (`z910`), after the `feature_is_support_user_custom_gallery_share` gate. | Bypasses only the private Oplus share-page product flag and enters the existing system chooser. Its URI helper first maps a local `qkm` media path through `GalleryFileProvider`, then retains the stock image/video MediaStore fallbacks. |
+| Dynamic receiver flags | `BroadcastDispatcher.kt` (`foundation/uikit/broadcast/bus/a`) proxy registration and the concrete `ActionReceiver`. | Clears `RECEIVER_EXPORTED` and sets `RECEIVER_NOT_EXPORTED`, preserving unrelated flag bits. |
+| Wallpaper intent | `PictureEditorDM.a(Activity, Uri, boolean)` is the method containing `getCropAndSetWallpaperIntent`. | Uses `ACTION_ATTACH_DATA` with `image/*`, URI read permission, and the existing activity instead of the unavailable Oplus wallpaper crop flow, while preserving the live-photo extra. |
+| Safe Box capability | `ConfigAbilityWrapper.kt` (`n6b`), the global boolean accessor `b(String, boolean, boolean)`. | Returns true only for `feature_is_support_user_custom_safe_box`; all other config keys retain stock handling. |
+| Google Photos verify listener | `GCloudPageHelper$launchBackupPage$1$1.a(boolean)`. | Continues into the existing page helper for either verification result so a failed first verification can reach consent. COS17 now propagates the failure through `GCloudSyncStatusManager` itself, so the old injected consent coroutine is no longer needed. |
+| Hide Google Photos surfaces | The `action_backup_to_cloud` action-definition `LinkedHashMap` (`pqx`) and `SettingsActivity$SettingFragment`. | Removes the backup action ID from the photo-page menu map and removes `pref_category_cloud_sync_key` after Settings inflation. |
+| System share | `ShareHelper.kt`, after the `feature_is_support_user_custom_gallery_share` gate. | Bypasses only the private Oplus share-page product flag and enters the existing system chooser. Its URI helper maps the local `o3q` media object's `A()` path through `GalleryFileProvider` (`j1i`), then retains the stock image/video MediaStore fallbacks. |
 | Lighthouse QNN runtime | Gallery's manifest references nonexistent V75 `/odm/lib64/aiboost` paths, including a duplicate. | Removes the complete obsolete path family, declares the six root-level V81 libraries present in the Lighthouse dump, and embeds the exact dump binaries. |
 
 Do not restore the old override of `vzt.m()`. In this Gallery build that method
@@ -65,27 +73,20 @@ photo actions.
 
 ## File Manager
 
-| Fixup | 16.0.9.403 semantic target | Effect |
+| Fixup | 17.0.0.101 semantic target | Effect |
 | --- | --- | --- |
 | Direct safe check | `JavaFileHelper` (`common/fileutils/e`), uniquely anchored by `safeCheck start`. | Executes the supplied Kotlin function directly and preserves its result/logging, avoiding an unavailable OEM safe-check wrapper. |
 | Select-directory fallback | `SelectDirPathPanelFragment` click flow. | When its selected-path LiveData is null/empty, uses `BrowserPathBar.getCurrentPath()`, which is updated during navigation. |
-| Same-volume cut | `FileActionCut.V()` obtains the same-volume boolean from `cut/g.j()`; the later branch calls `K0()` for cross-device handling. | Skips `K0()` only when the derived same-volume field is true. Cross-volume moves retain stock behavior. |
-| Super App archive preview | Initial entry of `SuperListFragment$n.invokeSuspend`; `c.v() == 0x80` is the app's archive type and `ga/a.Q0(...)` creates `ACTION_COMPRESS_PREVIEW`. | Opens an archive directly in the built-in preview flow and returns Kotlin `Unit`; all non-archive items continue through the stock coroutine. |
-
-The two older OSense no-op patches are intentionally inactive. In this build,
-`w8/b.f()` already checks the app's AOSP predicate (`q8/k.b()`) before calling
-the scene API. Replacing `FileActionBaseCopyCut.c0()` or the whole scene helper
-would now suppress valid file-operation behavior.
 
 ## Other applications and manifests
 
 | Package/file | Fixup and reason |
 | --- | --- |
-| SystemUIPlugin | Replaces Oplus wrapper API descriptors. The old `k9/b`/`t4/h` inflater patch is retired: those classes now represent unrelated constants and a `CompositionSamplingListener`, while the current plugin uses `ContextHandler` directly. |
-| OplusGestureUI | Moves the private `com.oplus.gesture_nonIndexKey` cache in `GestureSettingsProviderUtils` (`k8/q`) from `Settings.System` to `Settings.Secure`. AOSP rejects app-defined System settings and otherwise propagates the provider exception into SettingsIntelligence during search indexing. Its 19 indexed preference XMLs also use unqualified `PreferenceScreen` roots so Google Settings Intelligence can parse them. |
-| Melody | `RepackagingDetector.java` (`com/oplus/melody/common/util/N`) derives the AES key used for the bundled earphone whitelist from the signing certificate. Methods `b/c/d(Context)` return the verified stock SHA-256 certificate hash `B0:A9:BB:FC:05:EE:E5:E7:D0:A2:C9:7C:03:05:86:E1:5B:B3:30:11:52:07:8F:54:47:3B:B8:2D:F6:D8:C8:18`; only `e(Context)`, the LSPatch predicate, is forced false. |
+| SystemUIPlugin | Replaces Oplus wrapper API descriptors with the corresponding framework hidden APIs. |
+| OplusGestureUI | Moves the private `com.oplus.gesture_nonIndexKey` cache in `GestureSettingsProviderUtils` (`lb/r`) from `Settings.System` to `Settings.Secure`. AOSP rejects app-defined System settings and otherwise propagates the provider exception into SettingsIntelligence during search indexing. Its 19 indexed preference XMLs also use unqualified `PreferenceScreen` roots so Google Settings Intelligence can parse them. |
+| Melody | The methods semantically located in `RepackagingDetector.java` derive the AES key used for the bundled earphone whitelist from the signing certificate. Its certificate-hash methods return the verified stock SHA-256 hash `B0:A9:BB:FC:05:EE:E5:E7:D0:A2:C9:7C:03:05:86:E1:5B:B3:30:11:52:07:8F:54:47:3B:B8:2D:F6:D8:C8:18`; only the LSPatch predicate is forced false. |
 | StdID | Converts both `AppApplication.onCreate()` dynamic receiver registrations to the flags overload with `RECEIVER_NOT_EXPORTED`, preserving the optional permission argument. |
-| SafeCenter | Adds `RECEIVER_NOT_EXPORTED` to `BaseSelfFinishActivity`, forces the actual `OLockManager.isSupportOLock` predicate `j7/k.J(Context)` true, and supplies the missing OLock dark theme. |
+| SafeCenter | Adds `RECEIVER_NOT_EXPORTED` to `BaseSelfFinishActivity`, semantically locates and forces the actual `OLockManager.isSupportOLock(Context)` predicate true, and supplies the missing OLock dark theme. |
 | PhoneManager | Adds secure-settings permission, maps its Settings tile to AOSP's security/privacy category, and points the `MANAGE_PERMISSIONS` intent package from Google's permission controller to `com.android.permissioncontroller`. |
 | AONService / AIUnit | Maps their OEM Settings metadata to AOSP's advanced-security category so TileUtils places them correctly. AIUnit also uses an unqualified `PreferenceScreen` root for its AI Service Engine XML so Google Settings Intelligence can index it without crashing. |
 | UMS | Adds `SET_ACTIVITY_WATCHER` to both the manifest and its privapp allowlist. |
