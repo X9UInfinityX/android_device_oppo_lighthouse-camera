@@ -1,2 +1,5 @@
 # Camera watermark market name
 ro.vendor.oplus.market.name=OPPO Find X9 Ultra
+
+# COS17 APS otherwise retains raw jobs on builds it does not recognize as stock production.
+vendor.oplus.camera.debug.keep_raw_data=0
