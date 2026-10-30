@@ -1093,6 +1093,31 @@ def blob_fixup_securitypermission_safe_permissions(ctx, file, file_path, *args, 
         manifest.write_text(data, encoding='utf-8')
 
 
+def blob_fixup_exsystemservice_assistant_known_signer(
+    ctx, file, file_path, *args, tmp_dir=None, **kwargs,
+):
+    if tmp_dir is None:
+        return
+
+    # ExSystemService is re-signed with our platform key, while the COS17
+    # AIMemory APK keeps its Oplus signature. Allow that signer to retain the
+    # ASSISTANT permission required by the Pantanal provider on startup.
+    manifest = Path(tmp_dir) / 'AndroidManifest.xml'
+    data = manifest.read_text(encoding='utf-8')
+    original = (
+        '<permission android:name="com.oplus.permission.safe.ASSISTANT" '
+        'android:protectionLevel="signature"/>'
+    )
+    patched = (
+        '<permission android:name="com.oplus.permission.safe.ASSISTANT" '
+        'android:protectionLevel="signature|knownSigner" '
+        'android:knownCerts="C9305EE38A28E5EE0E469B7F66164AF4DC680D6141B8F56A090E6DE25578B651"/>'
+    )
+    if data.count(original) != 1:
+        raise ValueError('ExSystemService ASSISTANT permission patch point not found')
+    manifest.write_text(data.replace(original, patched, 1), encoding='utf-8')
+
+
 def blob_fixup_oppogallery_receiver_flags(ctx, file, file_path, *args, tmp_dir=None, **kwargs):
     if tmp_dir is None:
         return
@@ -2075,6 +2100,7 @@ blob_fixups: blob_fixups_user_type = {
     'system_ext/priv-app/OplusExSystemService/OplusExSystemService.apk': blob_fixup()
         .call(blob_fixup_apktool_unpack_full)
         .call(blob_fixup_opluscamera_uses_library)
+        .call(blob_fixup_exsystemservice_assistant_known_signer)
         .apktool_pack()
         .stripzip(),
     'system_ext/priv-app/DCS/DCS.apk': blob_fixup()
