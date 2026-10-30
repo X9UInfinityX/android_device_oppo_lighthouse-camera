@@ -6,6 +6,8 @@ hal_client_domain(opluscamera_app, vendor_hal_oplus_urcc)
 
 allow opluscamera_app public_adsprpcd_file:file r_file_perms;
 allow opluscamera_app same_process_hal_file:file r_file_perms;
+# FastRPC watches its RFSA search directories for DSP-side image-processing data.
+allow opluscamera_app vendor_file:dir watch;
 
 # Camera live bokeh reads OCCE shader/cache files generated under /mnt/occe.
 allow opluscamera_app occe_data_file:dir r_dir_perms;
@@ -29,8 +31,8 @@ allow opluscamera_app vendor_qdsp_device:chr_file { ioctl open read };
 dontaudit opluscamera_app vendor_xdsp_device:chr_file { getattr ioctl open read write create unlink };
 
 # Text/OCR and night capture paths traverse /data/vendor/camera for OEM state.
-allow opluscamera_app vendor_camera_data_file:dir { add_name create getattr open read remove_name rename rmdir search write };
-allow opluscamera_app vendor_camera_data_file:file { create getattr map open read rename unlink write };
+allow opluscamera_app vendor_camera_data_file:dir { add_name create getattr open read remove_name rename reparent rmdir search setattr write };
+allow opluscamera_app vendor_camera_data_file:file { create getattr map open read rename setattr unlink write };
 
 # Preview document probing traverses /data/local/tmp while preparing capture.
 allow opluscamera_app shell_data_file:dir search;
