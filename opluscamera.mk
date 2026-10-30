@@ -4,6 +4,9 @@ OPLUS_CAMERA_PATH := device/oppo/lighthouse-camera
 # Properties with spaces must come from a property file rather than a Make list.
 TARGET_VENDOR_PROP += $(OPLUS_CAMERA_PATH)/vendor.prop
 
+# Enable the camera-only native OSense bridge in system_server.
+PRODUCT_SYSTEM_PROPERTIES += ro.oplus.camera.osense_compat=true
+
 # Blob dependencies
 PRODUCT_PACKAGES += \
     aon.frameworkres.overlay.product \
