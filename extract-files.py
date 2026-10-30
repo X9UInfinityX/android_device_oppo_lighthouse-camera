@@ -137,6 +137,62 @@ def blob_fixup_opluscamera_restore_untouched_dex(
         rebuilt_path.unlink(missing_ok=True)
 
 
+def blob_fixup_opluscamera_rear_rgb_sensor(
+    ctx, file, file_path, *args, tmp_dir=None, **kwargs,
+):
+    """Keep the stock rear RGB sensor active during a Camera session.
+
+    ColorOS normally registers this sensor from its display service. The
+    AOSP display service does not call that Oplus extension, leaving the
+    camera's color-sensor channel without samples on this device.
+    """
+    if tmp_dir is None:
+        return
+
+    camera_smali = _find_smali(
+        tmp_dir, 'com/oplus/camera/Camera.smali', 'OplusCamera activity',
+    )
+    data = camera_smali.read_text(encoding='utf-8')
+    start = (
+        '    invoke-static {p0}, '
+        'Lcom/oplus/camera/port/RearRgbSensorKeepalive;->start(Landroid/content/Context;)V\n'
+    )
+    stop = (
+        '    invoke-static {}, '
+        'Lcom/oplus/camera/port/RearRgbSensorKeepalive;->stop()V\n'
+    )
+    anchors = (
+        (
+            '.method public b0(Landroid/os/Bundle;)V\n    .locals 7\n',
+            '.method public b0(Landroid/os/Bundle;)V\n    .locals 7\n\n' + start,
+        ),
+        (
+            '    :cond_0\n'
+            '    invoke-static {p0}, Lqa/n3;->a(Landroid/content/Context;)Landroid/app/KeyguardManager;\n',
+            '    :cond_0\n' + start +
+            '    invoke-static {p0}, Lqa/n3;->a(Landroid/content/Context;)Landroid/app/KeyguardManager;\n',
+        ),
+        (
+            '    invoke-virtual {v0}, Lcom/oplus/camera/CameraManager;->g2()V\n',
+            '    invoke-virtual {v0}, Lcom/oplus/camera/CameraManager;->g2()V\n\n' + stop,
+        ),
+    )
+    for original, replacement in anchors:
+        if data.count(original) != 1:
+            raise ValueError(f'OplusCamera rear RGB lifecycle anchor missing: {original!r}')
+        data = data.replace(original, replacement, 1)
+    camera_smali.write_text(data, encoding='utf-8')
+
+    helper = camera_smali.parent / 'port' / 'RearRgbSensorKeepalive.smali'
+    if helper.exists():
+        raise ValueError('OplusCamera rear RGB helper already exists')
+    helper.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(
+        Path(__file__).parent / 'patches-camera' / 'RearRgbSensorKeepalive.smali',
+        helper,
+    )
+
+
 def lib_fixup_system_ext_suffix(lib: str, partition: str, *args, **kwargs):
     """
     Mirrors lib_to_package_fixup_system_ext_variants from the old setup-makefiles.sh.
@@ -1923,6 +1979,7 @@ blob_fixups: blob_fixups_user_type = {
     'system_ext/priv-app/OplusCamera/OplusCamera.apk': blob_fixup()
         .call(blob_fixup_apktool_unpack_full)
         .call(blob_fixup_opluscamera_capture_dex)
+        .call(blob_fixup_opluscamera_rear_rgb_sensor)
         .call(blob_fixup_opluscamera_font)
         .call(blob_fixup_opluscamera_blur_seginit_guard)
         .call(blob_fixup_strip_oem_permissions)
